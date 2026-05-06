@@ -1,0 +1,10 @@
+# Coloque na raiz do repositório da aplicação (mesmo nível do clone).
+# runner: apenas "pm2" é suportado por enquanto.
+runner: pm2
+
+build:
+  - npm ci
+  - npm run build
+
+# Caminho relativo à raiz do repositório para o pm2 start.
+target: dist/main.js

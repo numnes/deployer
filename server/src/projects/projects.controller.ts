@@ -1,0 +1,58 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
+import { ProjectsService } from './projects.service';
+
+@ApiTags('projects')
+@Controller('projects')
+export class ProjectsController {
+  constructor(private readonly projects: ProjectsService) {}
+
+  @ApiBearerAuth('jwt')
+  @ApiBody({ type: CreateProjectDto })
+  @ApiOkResponse({ description: 'Projeto criado' })
+  @UseGuards(JwtAuthGuard)
+  @Post()
+  create(@Body() dto: CreateProjectDto) {
+    return this.projects.create(dto);
+  }
+
+  @ApiBearerAuth('jwt')
+  @ApiOkResponse({ description: 'Lista de projetos' })
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  list() {
+    return this.projects.findAll();
+  }
+
+  @ApiBearerAuth('jwt')
+  @ApiOkResponse({ description: 'Projeto por id' })
+  @UseGuards(JwtAuthGuard)
+  @Get(':id')
+  getOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.projects.findOne(id);
+  }
+
+  @ApiBearerAuth('jwt')
+  @ApiBody({ type: UpdateProjectDto })
+  @ApiOkResponse({ description: 'Projeto atualizado' })
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateProjectDto,
+  ) {
+    return this.projects.updateServerUrl(id, dto.serverUrl);
+  }
+}

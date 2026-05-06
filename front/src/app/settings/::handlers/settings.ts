@@ -1,0 +1,29 @@
+import { apiBaseClient, httpJson } from '@/lib/http';
+import { getTokenClient } from '@/lib/client-auth';
+
+export type SettingsPayload = {
+  maxActiveInstancesParsed?: number;
+  max_active_instances?: string;
+  [key: string]: unknown;
+};
+
+export async function fetchSettings(): Promise<SettingsPayload> {
+  const token = getTokenClient();
+  return await httpJson<SettingsPayload>(`${apiBaseClient()}/settings`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function patchSettings(body: {
+  maxActiveInstances?: number;
+}): Promise<SettingsPayload> {
+  const token = getTokenClient();
+  return await httpJson<SettingsPayload>(`${apiBaseClient()}/settings`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}

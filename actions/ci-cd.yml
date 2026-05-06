@@ -1,0 +1,59 @@
+# Copie para: <repo-da-app>/.github/workflows/ci-cd.yml
+# Secrets: DEPLOYER_API_URL, DEPLOYER_API_KEY
+# Variável do repositório: DEPLOYER_PROJECT_SLUG (slug cadastrado via POST /projects)
+name: Deployer CI — preview
+
+on:
+  pull_request:
+    branches:
+      - master
+      - homologation
+
+jobs:
+  deploy-preview:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy na ferramenta
+        env:
+          DEPLOYER_API_URL: ${{ secrets.DEPLOYER_API_URL }}
+          DEPLOYER_API_KEY: ${{ secrets.DEPLOYER_API_KEY }}
+          PROJECT_SLUG: ${{ vars.DEPLOYER_PROJECT_SLUG }}
+        run: |
+          if [ -z "$DEPLOYER_API_URL" ] || [ -z "$DEPLOYER_API_KEY" ]; then
+            echo "Defina os secrets DEPLOYER_API_URL e DEPLOYER_API_KEY."
+            exit 1
+          fi
+          if [ -z "$PROJECT_SLUG" ]; then
+            echo "Defina a variável DEPLOYER_PROJECT_SLUG."
+            exit 1
+          fi
+          BRANCH="${{ github.head_ref }}"
+          curl -fsS -X POST "${DEPLOYER_API_URL%/}/deploy" \
+            -H "Content-Type: application/json" \
+            -H "X-Deployer-Api-Key: ${DEPLOYER_API_KEY}" \
+            -d "{\"project\":\"${PROJECT_SLUG}\",\"branch\":\"${BRANCH}\"}"
+
+  teardown-preview:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remover preview
+        env:
+          DEPLOYER_API_URL: ${{ secrets.DEPLOYER_API_URL }}
+          DEPLOYER_API_KEY: ${{ secrets.DEPLOYER_API_KEY }}
+          PROJECT_SLUG: ${{ vars.DEPLOYER_PROJECT_SLUG }}
+        run: |
+          if [ -z "$DEPLOYER_API_URL" ] || [ -z "$DEPLOYER_API_KEY" ]; then
+            echo "Defina os secrets DEPLOYER_API_URL e DEPLOYER_API_KEY."
+            exit 1
+          fi
+          if [ -z "$PROJECT_SLUG" ]; then
+            echo "Defina a variável DEPLOYER_PROJECT_SLUG."
+            exit 1
+          fi
+          BRANCH="${{ github.head_ref }}"
+          curl -fsS -X POST "${DEPLOYER_API_URL%/}/deploy/destroy" \
+            -H "Content-Type: application/json" \
+            -H "X-Deployer-Api-Key: ${DEPLOYER_API_KEY}" \
+            -d "{\"project\":\"${PROJECT_SLUG}\",\"branch\":\"${BRANCH}\"}"

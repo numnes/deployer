@@ -1,0 +1,11 @@
+server/node_modules/
+server/dist/
+front/node_modules/
+front/.next/
+tui/node_modules/
+**/node_modules/
+*.log
+.env
+.env.local
+**/.env
+**/.env.*

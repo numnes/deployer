@@ -1,0 +1,34 @@
+# Copie para o repositório da aplicação: .github/workflows/deploy-preview.yml
+# Secrets no repositório alvo: DEPLOYER_API_URL, DEPLOYER_API_KEY
+name: Deploy preview (deployer)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - master
+      - homologation
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Solicitar deploy na ferramenta
+        env:
+          DEPLOYER_API_URL: ${{ secrets.DEPLOYER_API_URL }}
+          DEPLOYER_API_KEY: ${{ secrets.DEPLOYER_API_KEY }}
+          PROJECT_SLUG: ${{ vars.DEPLOYER_PROJECT_SLUG }}
+        run: |
+          if [ -z "$DEPLOYER_API_URL" ] || [ -z "$DEPLOYER_API_KEY" ]; then
+            echo "Defina os secrets DEPLOYER_API_URL e DEPLOYER_API_KEY no repositório."
+            exit 1
+          fi
+          if [ -z "$PROJECT_SLUG" ]; then
+            echo "Defina a variável DEPLOYER_PROJECT_SLUG no repositório (slug cadastrado na API)."
+            exit 1
+          fi
+          BRANCH="${{ github.head_ref }}"
+          curl -fsS -X POST "${DEPLOYER_API_URL%/}/deploy" \
+            -H "Content-Type: application/json" \
+            -H "X-Deployer-Api-Key: ${DEPLOYER_API_KEY}" \
+            -d "{\"project\":\"${PROJECT_SLUG}\",\"branch\":\"${BRANCH}\"}"

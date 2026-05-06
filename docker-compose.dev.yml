@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: deployer-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: deployer
+      POSTGRES_DB: deployer
+    ports:
+      - "5432:5432"
+    volumes:
+      - deployer_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d deployer"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    container_name: deployer-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6480:6379"
+    volumes:
+      - deployer_redis:/data
+
+  front:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+      args:
+        # URL que o browser vai usar para falar com a API (a API roda no host via PM2)
+        NEXT_PUBLIC_API_URL: http://localhost:3000
+    container_name: deployer-front
+    ports:
+      - "3001:3000"
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - postgres
+      - redis
+
+volumes:
+  deployer_pg:
+  deployer_redis:
+
