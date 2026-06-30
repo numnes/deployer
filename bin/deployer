@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CLI do deployer — wrapper dos scripts em scripts/
+# deployer CLI — wrapper for scripts in scripts/
 set -euo pipefail
 
 resolve_deployer_root() {
@@ -24,8 +24,8 @@ resolve_deployer_root() {
 ROOT="$(resolve_deployer_root)"
 
 if [[ ! -d "$ROOT/scripts" ]]; then
-  echo "deployer: diretório de instalação inválido: $ROOT" >&2
-  echo "Defina DEPLOYER_ROOT ou reinstale com scripts/install.sh" >&2
+  echo "deployer: invalid install directory: $ROOT" >&2
+  echo "Set DEPLOYER_ROOT or reinstall with scripts/install.sh" >&2
   exit 1
 fi
 
@@ -37,13 +37,13 @@ confirm_down() {
     return 0
   fi
   echo ""
-  echo "⚠  O deployer será derrubado:"
+  echo "⚠  This will shut down deployer:"
   echo "   • API (PM2: deployer-api)"
-  echo "   • Containers Docker (Postgres, Redis, Front)"
+  echo "   • Docker containers (Postgres, Redis, Front)"
   echo ""
-  read -r -p "Continuar? [s/N] " ans
-  if [[ ! "$ans" =~ ^[sSyY]$ ]]; then
-    echo "Cancelado."
+  read -r -p "Continue? [y/N] " ans
+  if [[ ! "$ans" =~ ^[yY]$ ]]; then
+    echo "Cancelled."
     exit 0
   fi
 }
@@ -68,14 +68,14 @@ case "$cmd" in
     if docker ps -a --filter 'name=deployer-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null | grep -q deployer; then
       docker ps -a --filter 'name=deployer-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
     else
-      echo "  (nenhum container deployer-*)"
+      echo "  (no deployer-* containers)"
     fi
     echo ""
     echo "PM2:"
     if command -v pm2 >/dev/null 2>&1; then
-      pm2 describe deployer-api 2>/dev/null | grep -E 'status|name|script path' || echo "  deployer-api não está rodando"
+      pm2 describe deployer-api 2>/dev/null | grep -E 'status|name|script path' || echo "  deployer-api is not running"
     else
-      npx --yes pm2 describe deployer-api 2>/dev/null | grep -E 'status|name|script path' || echo "  deployer-api não está rodando"
+      npx --yes pm2 describe deployer-api 2>/dev/null | grep -E 'status|name|script path' || echo "  deployer-api is not running"
     fi
     ;;
   logs)
@@ -92,13 +92,13 @@ case "$cmd" in
         exec docker logs -f --tail 100 deployer-front
         ;;
       *)
-        echo "Uso: deployer logs [api|front]" >&2
+        echo "Usage: deployer logs [api|front]" >&2
         exit 1
         ;;
     esac
     ;;
   update|pull)
-    echo "[deployer] Atualizando repositório em $ROOT..."
+    echo "[deployer] Updating repository at $ROOT..."
     git -C "$ROOT" pull --ff-only
     echo "[deployer] OK"
     ;;
@@ -107,31 +107,31 @@ case "$cmd" in
     ;;
   help|-h|--help)
     cat <<EOF
-deployer — gerenciamento local do Deployer
+deployer — local Deployer stack management
 
-Uso: deployer <comando> [opções]
+Usage: deployer <command> [options]
 
-Comandos:
-  setup, up, start   Sobe Postgres, Redis, front (Docker) e API (PM2)
-  down, stop         Derruba API e containers (pede confirmação)
-  restart            down + setup (pede confirmação)
-  status             Mostra estado dos containers e da API
-  logs [api|front]   Segue logs da API (PM2) ou do front (Docker)
-  update, pull       git pull no diretório de instalação
-  root, path         Imprime o diretório de instalação
-  help               Esta ajuda
+Commands:
+  setup, up, start   Start Postgres, Redis, front (Docker) and API (PM2)
+  down, stop         Stop API and containers (asks for confirmation)
+  restart            down + setup (asks for confirmation)
+  status             Show container and API status
+  logs [api|front]   Follow API (PM2) or front (Docker) logs
+  update, pull       git pull in the install directory
+  root, path         Print install directory
+  help               Show this help
 
-Opções:
-  down/restart -y, --yes   Pula confirmação
-  DEPLOYER_YES=1           Idem
+Options:
+  down/restart -y, --yes   Skip confirmation
+  DEPLOYER_YES=1           Same as above
 
-Instalação: curl -fsSL .../scripts/install.sh | bash
-Diretório:  $ROOT
+Install: curl -fsSL .../scripts/install.sh | bash
+Directory: $ROOT
 EOF
     ;;
   *)
-    echo "deployer: comando desconhecido: $cmd" >&2
-    echo "Rode: deployer help" >&2
+    echo "deployer: unknown command: $cmd" >&2
+    echo "Run: deployer help" >&2
     exit 1
     ;;
 esac
