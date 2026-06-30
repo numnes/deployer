@@ -14,8 +14,8 @@ export class DeployController {
   @ApiOkResponse({ description: 'Enfileira um deploy' })
   @UseGuards(DeployApiKeyGuard)
   @Post('deploy')
-  async createDeploy(@Body() body: DeployBodyDto) {
-    return this.deployService.enqueueDeploy(body.project, body.branch);
+  async createDeploy(@Body() data: DeployBodyDto) {
+    return this.deployService.enqueueDeploy(data);
   }
 
   @ApiSecurity('deploy-api-key')

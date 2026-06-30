@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# CLI do deployer — wrapper dos scripts em scripts/
+set -euo pipefail
+
+resolve_deployer_root() {
+  if [[ -n "${DEPLOYER_ROOT:-}" ]]; then
+    echo "$DEPLOYER_ROOT"
+    return
+  fi
+  if [[ -f "${HOME}/.config/deployer/root" ]]; then
+    cat "${HOME}/.config/deployer/root"
+    return
+  fi
+  local script
+  script="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || true)"
+  if [[ -z "$script" ]]; then
+    script="${BASH_SOURCE[0]}"
+  fi
+  local dir
+  dir="$(cd "$(dirname "$script")/.." && pwd)"
+  echo "$dir"
+}
+
+ROOT="$(resolve_deployer_root)"
+
+if [[ ! -d "$ROOT/scripts" ]]; then
+  echo "deployer: diretório de instalação inválido: $ROOT" >&2
+  echo "Defina DEPLOYER_ROOT ou reinstale com scripts/install.sh" >&2
+  exit 1
+fi
+
+cmd="${1:-help}"
+shift || true
+
+confirm_down() {
+  if [[ "${DEPLOYER_YES:-}" == "1" || "${1:-}" == "-y" || "${1:-}" == "--yes" ]]; then
+    return 0
+  fi
+  echo ""
+  echo "⚠  O deployer será derrubado:"
+  echo "   • API (PM2: deployer-api)"
+  echo "   • Containers Docker (Postgres, Redis, Front)"
+  echo ""
+  read -r -p "Continuar? [s/N] " ans
+  if [[ ! "$ans" =~ ^[sSyY]$ ]]; then
+    echo "Cancelado."
+    exit 0
+  fi
+}
+
+case "$cmd" in
+  setup|up|start)
+    exec bash "${ROOT}/scripts/dev-up.sh" "$@"
+    ;;
+  down|stop)
+    confirm_down "$@"
+    exec bash "${ROOT}/scripts/dev-down.sh" "$@"
+    ;;
+  restart)
+    confirm_down "$@"
+    bash "${ROOT}/scripts/dev-down.sh"
+    exec bash "${ROOT}/scripts/dev-up.sh" "$@"
+    ;;
+  status)
+    echo "=== Deployer ($ROOT) ==="
+    echo ""
+    echo "Docker:"
+    if docker ps -a --filter 'name=deployer-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null | grep -q deployer; then
+      docker ps -a --filter 'name=deployer-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+    else
+      echo "  (nenhum container deployer-*)"
+    fi
+    echo ""
+    echo "PM2:"
+    if command -v pm2 >/dev/null 2>&1; then
+      pm2 describe deployer-api 2>/dev/null | grep -E 'status|name|script path' || echo "  deployer-api não está rodando"
+    else
+      npx --yes pm2 describe deployer-api 2>/dev/null | grep -E 'status|name|script path' || echo "  deployer-api não está rodando"
+    fi
+    ;;
+  logs)
+    target="${1:-api}"
+    case "$target" in
+      api)
+        if command -v pm2 >/dev/null 2>&1; then
+          exec pm2 logs deployer-api --lines 100
+        else
+          exec npx --yes pm2 logs deployer-api --lines 100
+        fi
+        ;;
+      front)
+        exec docker logs -f --tail 100 deployer-front
+        ;;
+      *)
+        echo "Uso: deployer logs [api|front]" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  update|pull)
+    echo "[deployer] Atualizando repositório em $ROOT..."
+    git -C "$ROOT" pull --ff-only
+    echo "[deployer] OK"
+    ;;
+  root|path)
+    echo "$ROOT"
+    ;;
+  help|-h|--help)
+    cat <<EOF
+deployer — gerenciamento local do Deployer
+
+Uso: deployer <comando> [opções]
+
+Comandos:
+  setup, up, start   Sobe Postgres, Redis, front (Docker) e API (PM2)
+  down, stop         Derruba API e containers (pede confirmação)
+  restart            down + setup (pede confirmação)
+  status             Mostra estado dos containers e da API
+  logs [api|front]   Segue logs da API (PM2) ou do front (Docker)
+  update, pull       git pull no diretório de instalação
+  root, path         Imprime o diretório de instalação
+  help               Esta ajuda
+
+Opções:
+  down/restart -y, --yes   Pula confirmação
+  DEPLOYER_YES=1           Idem
+
+Instalação: curl -fsSL .../scripts/install.sh | bash
+Diretório:  $ROOT
+EOF
+    ;;
+  *)
+    echo "deployer: comando desconhecido: $cmd" >&2
+    echo "Rode: deployer help" >&2
+    exit 1
+    ;;
+esac

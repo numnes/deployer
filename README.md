@@ -60,6 +60,36 @@ Uma instância (branch) pode estar em:
   - `GET /settings` (JWT)
   - `PATCH /settings` (JWT)
 
+## Instalação (CLI `deployer`)
+
+Clone o projeto para `~/deployer` e registre o executável `deployer` em `~/.local/bin`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/numnes/deployer/main/scripts/install.sh | bash
+```
+
+Certifique-se de que `~/.local/bin` está no `PATH`.
+
+### Comandos
+
+```bash
+deployer setup          # sobe Postgres, Redis, front e API (equivale a dev-up)
+deployer down           # derruba tudo — pede confirmação antes
+deployer restart        # down + setup
+deployer status         # containers Docker + PM2
+deployer logs api       # logs da API
+deployer logs front     # logs do front
+deployer update         # git pull no diretório de instalação
+deployer help
+```
+
+Pular confirmação ao derrubar: `deployer down -y` ou `DEPLOYER_YES=1 deployer down`.
+
+Variáveis do instalador:
+
+- `DEPLOYER_INSTALL_DIR` — destino do clone (padrão `~/deployer`)
+- `DEPLOYER_REPO_URL` — URL do repositório git
+
 ## Ambiente local (Docker + PM2)
 
 Este repositório pode ser iniciado localmente com:
@@ -71,12 +101,9 @@ Este repositório pode ser iniciado localmente com:
 ### Pré-requisitos
 
 - Docker (com `docker compose`)
-- Node.js 22+
-- `pnpm` e `pm2` instalados globalmente:
+- Node.js 22+ (com `npm` no PATH)
 
-```bash
-npm i -g pnpm pm2
-```
+`pnpm` e `pm2` **não precisam** estar instalados globalmente: o script usa `npx pnpm@10` e `npx pm2` como fallback.
 
 ### Subir tudo
 
@@ -84,13 +111,26 @@ npm i -g pnpm pm2
 
 - `DATABASE_URL=postgresql://postgres:deployer@localhost:5432/deployer`
 - `REDIS_HOST=localhost`
-- `REDIS_PORT=6480`
+- `REDIS_PORT=6480` (o script pode usar outra porta se `6480` estiver ocupada)
 - `TYPEORM_SYNC=true`
 
 2) Rode:
 
 ```bash
-./scripts/dev-up.sh
+deployer setup
+# ou, a partir do clone: ./scripts/dev-up.sh
+```
+
+O script pergunta **e-mail e senha** do usuário admin e cadastra no Postgres.
+
+Para pular ou automatizar:
+
+```bash
+# não perguntar / não criar usuário
+DEPLOYER_SKIP_SEED_USER=1 ./scripts/dev-up.sh
+
+# credenciais sem prompt
+DEPLOYER_SEED_EMAIL=admin@exemplo.com DEPLOYER_SEED_PASSWORD=senha12345 ./scripts/dev-up.sh
 ```
 
 Endpoints:
@@ -101,7 +141,8 @@ Endpoints:
 ### Derrubar tudo
 
 ```bash
-./scripts/dev-down.sh
+deployer down
+# ou: ./scripts/dev-down.sh
 ```
 
 ## Variáveis de ambiente (API)

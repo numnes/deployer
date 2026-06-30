@@ -1,6 +1,5 @@
 'use client';
 
-import { Nav } from '@/components/Nav';
 import { PageContainer } from '@/components/PageContainer';
 import { RequireAuth } from '@/components/RequireAuth';
 import Link from 'next/link';
@@ -72,8 +71,6 @@ export default function InstanceDetailPage() {
   return (
     <RequireAuth>
       <PageContainer>
-        <Nav />
-        <div className="h-5" />
         <div className="mb-3 text-sm text-white/70">
           <Link className="text-sky-200/90 hover:underline" href="/instances">
             ← Voltar às instâncias

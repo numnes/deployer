@@ -15,6 +15,7 @@ import { User } from './entities/user.entity';
 import { InstancesModule } from './instances/instances.module';
 import { ProjectsModule } from './projects/projects.module';
 import { SettingsModule } from './settings/settings.module';
+import { SetupModule } from './setup/setup.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -55,6 +56,7 @@ import { UsersModule } from './users/users.module';
     DeployModule,
     InstancesModule,
     DashboardModule,
+    SetupModule,
     UsersModule,
   ],
 })

@@ -1,9 +1,7 @@
 'use client';
 
-import { Nav } from '@/components/Nav';
 import { PageContainer } from '@/components/PageContainer';
 import { RequireAuth } from '@/components/RequireAuth';
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import {
   Bar,
@@ -70,22 +68,11 @@ export default function HomePage() {
   return (
     <RequireAuth>
       <PageContainer>
-        <Nav />
-        <div className="h-5" />
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm text-white/70">
-          <Link className="text-sky-200/90 hover:underline" href="/settings">
-            Configurações da ferramenta
-          </Link>
-        </div>
-        {err ? (
-          <div className="mb-4 rounded-xl border border-rose-200/30 bg-rose-200/10 px-3 py-2 text-sm text-white/85">
-            {err}
-          </div>
-        ) : null}
+        {err ? <div className="alert-error mb-4">{err}</div> : null}
         <div className="grid gap-5 lg:grid-cols-2">
           <div className="card p-5 lg:col-span-2">
-            <div className="text-lg font-bold">Recursos do servidor</div>
-            <p className="mt-1 text-sm text-white/60">
+            <h1 className="page-title">Recursos do servidor</h1>
+            <p className="page-subtitle">
               Uso de CPU/RAM/disco da máquina onde a API está rodando.
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -131,8 +118,8 @@ export default function HomePage() {
             </div>
           </div>
           <div className="card p-5">
-            <div className="text-lg font-bold">Instâncias por status</div>
-            <p className="mt-1 text-sm text-white/60">
+            <h2 className="page-title">Instâncias por status</h2>
+            <p className="page-subtitle">
               Limite configurado:{' '}
               <span className="font-semibold text-white/90">
                 {data?.maxActiveInstances ?? '—'}
@@ -154,7 +141,7 @@ export default function HomePage() {
                       }}
                       labelStyle={{ color: 'rgba(255,255,255,0.85)' }}
                     />
-                    <Bar dataKey="value" fill="rgba(125, 211, 252, 0.55)" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="value" fill="#6b7280" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
@@ -163,8 +150,8 @@ export default function HomePage() {
             </div>
           </div>
           <div className="card p-5">
-            <div className="text-lg font-bold">Últimos projetos com atividade</div>
-            <p className="mt-1 text-sm text-white/60">
+            <h2 className="page-title">Últimos projetos com atividade</h2>
+            <p className="page-subtitle">
               Ordenado pela última atualização em qualquer instância do projeto.
             </p>
             <ul className="mt-4 space-y-2 text-sm">
@@ -185,7 +172,7 @@ export default function HomePage() {
             </ul>
           </div>
           <div className="card p-5 lg:col-span-2">
-            <div className="text-lg font-bold">Últimas mudanças de status</div>
+            <h2 className="page-title">Últimas mudanças de status</h2>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full min-w-[640px] border-collapse text-sm">
                 <thead>

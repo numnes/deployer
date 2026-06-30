@@ -1,6 +1,5 @@
 'use client';
 
-import { Nav } from '@/components/Nav';
 import { PageContainer } from '@/components/PageContainer';
 import { RequireAuth } from '@/components/RequireAuth';
 import { ClientTable } from '@/components/ClientTable';
@@ -34,8 +33,6 @@ export default function InstancesPage() {
   return (
     <RequireAuth>
       <PageContainer>
-        <Nav />
-        <div className="h-5" />
         <div className="card p-5">
           <div className="text-lg font-bold">Instâncias registradas</div>
           <div className="mt-1.5 text-sm text-white/70">

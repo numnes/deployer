@@ -6,16 +6,22 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  const corsOrigin =
+  const localhostPort3Patterns = [
+    /^https?:\/\/localhost:3\d*$/,
+    /^https?:\/\/127\.0\.0\.1:3\d*$/,
+    /^https?:\/\/\[::1\]:3\d*$/,
+  ];
+
+  const corsOriginEnv =
     process.env.CORS_ORIGIN?.split(',')
       .map((s) => s.trim())
       .filter(Boolean) ?? [];
 
   app.enableCors({
     origin:
-      corsOrigin.length > 0
-        ? corsOrigin
-        : [/^http:\/\/localhost:\d+$/, /^http:\/\/127\.0\.0\.1:\d+$/],
+      corsOriginEnv.length > 0
+        ? [...corsOriginEnv, ...localhostPort3Patterns]
+        : localhostPort3Patterns,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
