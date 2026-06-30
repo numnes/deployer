@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Pergunta e-mail/senha e grava usuário no Postgres (via scripts/seed-default-user.js).
+# Prompts for email/password and writes admin user to Postgres (via scripts/seed-default-user.js).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ -n "${DEPLOYER_SKIP_SEED_USER:-}" ]]; then
-  echo "[dev-up] DEPLOYER_SKIP_SEED_USER definido; pulando usuário padrão."
+  echo "[dev-up] DEPLOYER_SKIP_SEED_USER set; skipping default user."
   exit 0
 fi
 
@@ -13,26 +13,26 @@ prompt_credentials() {
   local email password password2
 
   if [[ -n "${DEPLOYER_SEED_EMAIL:-}" && -n "${DEPLOYER_SEED_PASSWORD:-}" ]]; then
-    echo "[dev-up] Usando DEPLOYER_SEED_EMAIL / DEPLOYER_SEED_PASSWORD do ambiente."
+    echo "[dev-up] Using DEPLOYER_SEED_EMAIL / DEPLOYER_SEED_PASSWORD from environment."
     return 0
   fi
 
   echo ""
-  echo "[dev-up] Usuário padrão do deployer (login no front)"
-  read -r -p "E-mail: " email
+  echo "[dev-up] Default deployer user (dashboard login)"
+  read -r -p "Email: " email
   export DEPLOYER_SEED_EMAIL="$email"
 
   while true; do
-    read -r -s -p "Senha (mín. 8 caracteres): " password
+    read -r -s -p "Password (min. 8 characters): " password
     echo ""
-    read -r -s -p "Confirmar senha: " password2
+    read -r -s -p "Confirm password: " password2
     echo ""
     if [[ ${#password} -lt 8 ]]; then
-      echo "Senha muito curta. Use pelo menos 8 caracteres." >&2
+      echo "Password too short. Use at least 8 characters." >&2
       continue
     fi
     if [[ "$password" != "$password2" ]]; then
-      echo "As senhas não coincidem." >&2
+      echo "Passwords do not match." >&2
       continue
     fi
     export DEPLOYER_SEED_PASSWORD="$password"
@@ -43,12 +43,12 @@ prompt_credentials() {
 prompt_credentials
 
 if ! docker ps --format '{{.Names}}' | grep -qx deployer-postgres; then
-  echo "[seed-user] Container deployer-postgres não está rodando." >&2
+  echo "[seed-user] Container deployer-postgres is not running." >&2
   exit 1
 fi
 
 if [[ ! -d "${ROOT_DIR}/server/node_modules/bcrypt" ]]; then
-  echo "[seed-user] Rode pnpm/npm install em server/ antes do seed." >&2
+  echo "[seed-user] Run pnpm/npm install in server/ before seeding." >&2
   exit 1
 fi
 

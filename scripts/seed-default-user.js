@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Cria ou atualiza o usuário admin no Postgres.
- * Uso: DEPLOYER_SEED_EMAIL=... DEPLOYER_SEED_PASSWORD=... node scripts/seed-default-user.js
+ * Create or update admin user in Postgres.
+ * Usage: DEPLOYER_SEED_EMAIL=... DEPLOYER_SEED_PASSWORD=... node scripts/seed-default-user.js
  */
 const fs = require('fs');
 const path = require('path');
@@ -31,15 +31,15 @@ async function main() {
   const password = process.env.DEPLOYER_SEED_PASSWORD || '';
 
   if (!email || !password) {
-    console.error('[seed-user] DEPLOYER_SEED_EMAIL e DEPLOYER_SEED_PASSWORD são obrigatórios.');
+    console.error('[seed-user] DEPLOYER_SEED_EMAIL and DEPLOYER_SEED_PASSWORD are required.');
     process.exit(1);
   }
   if (password.length < 8) {
-    console.error('[seed-user] A senha deve ter pelo menos 8 caracteres.');
+    console.error('[seed-user] Password must be at least 8 characters.');
     process.exit(1);
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    console.error('[seed-user] E-mail inválido.');
+    console.error('[seed-user] Invalid email.');
     process.exit(1);
   }
 
@@ -54,13 +54,13 @@ async function main() {
         passwordHash,
         email,
       ]);
-      console.log(`[seed-user] Senha atualizada para ${email}`);
+      console.log(`[seed-user] Password updated for ${email}`);
     } else {
       await client.query(
         'INSERT INTO users (id, email, password_hash, created_at) VALUES (gen_random_uuid(), $1, $2, NOW())',
         [email, passwordHash],
       );
-      console.log(`[seed-user] Usuário criado: ${email}`);
+      console.log(`[seed-user] User created: ${email}`);
     }
   } finally {
     await client.end();
@@ -68,6 +68,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error('[seed-user] Erro:', e.message || e);
+  console.error('[seed-user] Error:', e.message || e);
   process.exit(1);
 });

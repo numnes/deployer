@@ -30,7 +30,7 @@ pick_redis_port() {
       return
     fi
   done
-  echo "Nenhuma porta livre para Redis (tente liberar 6480 ou 6380)." >&2
+  echo "No free port for Redis (try freeing 6480 or 6380)." >&2
   exit 1
 }
 
@@ -47,22 +47,22 @@ wait_for_http() {
     sleep 1
   done
   echo "000"
-  echo "[dev-up] Aviso: ${label} não respondeu a tempo (${url})." >&2
+  echo "[dev-up] Warning: ${label} did not respond in time (${url})." >&2
   return 1
 }
 
 REDIS_PUBLISH_PORT="$(pick_redis_port "${REDIS_PUBLISH_PORT:-6480}")"
 export REDIS_PUBLISH_PORT
 if docker ps --format '{{.Names}}' | grep -qx deployer-redis; then
-  echo "[dev-up] Redis do deployer em localhost:${REDIS_PUBLISH_PORT}"
+  echo "[dev-up] Deployer Redis on localhost:${REDIS_PUBLISH_PORT}"
 elif [[ "$REDIS_PUBLISH_PORT" != "6480" ]]; then
-  echo "[dev-up] Porta 6480 em uso; Redis publicado em ${REDIS_PUBLISH_PORT}"
+  echo "[dev-up] Port 6480 in use; Redis published on ${REDIS_PUBLISH_PORT}"
 fi
 
-echo "[dev-up] Subindo Postgres/Redis/Front no Docker..."
+echo "[dev-up] Starting Postgres/Redis/Front in Docker..."
 compose up -d --build postgres redis front
 
-echo "[dev-up] Aguardando Postgres ficar saudável..."
+echo "[dev-up] Waiting for Postgres to become healthy..."
 postgres_ok=false
 for _ in $(seq 1 60); do
   status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' deployer-postgres 2>/dev/null || true)"
@@ -73,12 +73,12 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 if [[ "$postgres_ok" != "true" ]]; then
-  echo "[dev-up] Postgres não ficou saudável a tempo." >&2
+  echo "[dev-up] Postgres did not become healthy in time." >&2
   compose ps
   exit 1
 fi
 
-echo "[dev-up] Construindo API (Nest) e iniciando no PM2..."
+echo "[dev-up] Building API (Nest) and starting with PM2..."
 if command -v pnpm >/dev/null 2>&1; then
   PKG_MGR=(pnpm)
 else
@@ -96,7 +96,7 @@ pushd "${ROOT_DIR}/server" >/dev/null
 "${PKG_MGR[@]}" run build
 popd >/dev/null
 
-echo "[dev-up] Configurando usuário padrão..."
+echo "[dev-up] Setting up default admin user..."
 bash "${ROOT_DIR}/scripts/seed-default-user.sh"
 
 pushd "${ROOT_DIR}/server" >/dev/null
@@ -105,7 +105,6 @@ if [[ -f ".env" ]]; then
   # shellcheck disable=SC1091
   source ".env"
 fi
-# Redis do compose pode estar em porta alternativa se 6480 estiver ocupada
 export REDIS_HOST="${REDIS_HOST:-localhost}"
 export REDIS_PORT="${REDIS_PUBLISH_PORT}"
 set +a
@@ -123,4 +122,4 @@ echo ""
 
 api_code="$(wait_for_http "http://localhost:${PORT:-3000}/docs" "API" || true)"
 front_code="$(wait_for_http "http://localhost:3001/" "Front" || true)"
-echo "[dev-up] Verificação: API /docs=${api_code}, Front=${front_code}"
+echo "[dev-up] Health check: API /docs=${api_code}, Front=${front_code}"
