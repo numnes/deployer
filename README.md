@@ -1,165 +1,116 @@
-# Deployer
+![Deployer banner](assets/banner.png)
 
-Deployer é uma ferramenta para criar e gerenciar **preview environments por branch**: cada branch de um projeto pode virar uma instância isolada (porta + processo PM2 + route no nginx), com fila e limite global de instâncias ativas.
+# deployer | Preview environments by branch
 
-## Como funciona (visão geral)
+**deployer** is a self-hosted tool to spin up **isolated preview environments for every branch** on your own server. Connect a GitHub Action, open a pull request, and get a live URL — without juggling servers by hand.
 
-- **Core (`core/`)**: scripts Bash que fazem o trabalho “no host”:
-  - clonar/atualizar repo da branch
-  - build/start com PM2
-  - criar/remover `location` do nginx (path `/{branchSlug}/`)
-  - pausar (derruba PM2/nginx mantendo checkout) e destruir (remove tudo)
-- **API (`server/`)**: NestJS + Postgres + BullMQ/Redis
-  - persiste projetos, instâncias, eventos e configurações
-  - aplica o limite global de instâncias ativas e mantém fila `waiting`
-  - processa jobs de deploy/destroy em background
-- **Front (`front/`)**: Next.js (dashboard e telas de administração)
+Each branch gets its own checkout, PM2 process, and nginx route (`/{branch-slug}/`). A web dashboard shows what's running, what's waiting in queue, and what's paused. You set a global limit on active instances; everything else waits until a slot opens.
 
-### Estados de instância
+Self-host it on a single machine. No SaaS signup required.
 
-Uma instância (branch) pode estar em:
+## Quick start
 
-- **`active`**: levantada (registrada no banco e com processo no PM2)
-- **`waiting`**: registrada, mas aguardando vaga no limite global
-- **`deploying`**: em deploy (job em execução)
-- **`paused`**: derrubada no host, mas mantida no banco (pode ser reativada)
-- **`error`**: falha ao deployar/reativar
-
-## Fluxos principais
-
-### Deploy (com fila)
-
-1. Um deploy é requisitado (endpoint com API key).
-2. A API verifica o limite `max_active_instances` (em `settings`).
-3. Se houver vaga: marca `deploying` e roda o core `deploy.sh`; ao final marca `active`.
-4. Se não houver vaga: cria/atualiza a instância como `waiting` **sem** rodar shell.
-5. Quando uma vaga é liberada (pause/remove), a fila `waiting` é processada e a próxima sobe.
-
-### Pausar / Ativar / Remover
-
-- **Pausar**: derruba PM2/nginx e mantém o registro (`paused`).
-- **Ativar / redeploy**: sobe instâncias `waiting/paused/error` quando possível; se já está `active`, força um redeploy.
-- **Remover**: executa destroy no host e remove o registro do banco (libera vaga imediatamente).
-
-## Endpoints (resumo)
-
-- **Auth**: login/registro (JWT)
-- **Deploy**:
-  - `POST /deploy` (API key)
-  - `POST /deploy/destroy` (API key)
-- **Dashboard**:
-  - `GET /dashboard/summary` (JWT)
-- **Instâncias**:
-  - `GET /instances` (JWT)
-  - `GET /instances/:id` (JWT)
-  - `GET /instances/:id/logs` (JWT)
-  - `POST /instances/:id/pause` (JWT)
-  - `POST /instances/:id/activate` (JWT)
-  - `POST /instances/:id/remove` (JWT)
-- **Configurações globais**:
-  - `GET /settings` (JWT)
-  - `PATCH /settings` (JWT)
-
-## Instalação (CLI `deployer`)
-
-Clone o projeto para `~/deployer` e registre o executável `deployer` em `~/.local/bin`:
+Install the CLI (clones to `~/deployer`, adds `deployer` to `~/.local/bin`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/numnes/deployer/main/scripts/install.sh | bash
 ```
 
-Certifique-se de que `~/.local/bin` está no `PATH`.
-
-### Comandos
+Make sure `~/.local/bin` is on your `PATH`, then:
 
 ```bash
-deployer setup          # sobe Postgres, Redis, front e API (equivale a dev-up)
-deployer down           # derruba tudo — pede confirmação antes
+deployer setup    # Postgres + Redis + front (Docker) + API (PM2)
+deployer status   # check services
+```
+
+- **Dashboard:** http://localhost:3001  
+- **API / Swagger:** http://localhost:3000/docs  
+
+On first setup you'll be prompted for an admin email and password.
+
+```bash
+deployer down       # stop everything (asks for confirmation)
+deployer down -y    # skip confirmation
+deployer help       # all commands
+```
+
+## Documentation
+
+| Topic | Where |
+|-------|--------|
+| GitHub Actions | Copy `actions/deploy-preview.yml` and `actions/teardown-preview.yml` into your repo |
+| Secrets & variables | Dashboard → **Setup → Secrets** (or see below) |
+| nginx on the host | `core/bin/setup-nginx.sh <domain>` + **Setup → Nginx** in the UI |
+| App config | `examples/deployer.yaml` in each project repo |
+| API reference | http://localhost:3000/docs after `deployer setup` |
+
+### GitHub secrets (in your app repo)
+
+| Name | Description |
+|------|-------------|
+| `DEPLOYER_API_URL` | Base URL of your deployer API |
+| `DEPLOYER_API_KEY` | API key from **Users → API Keys** |
+| `DEPLOYER_PROJECT_SLUG` (variable) | Project slug registered in deployer |
+
+## What you get
+
+- **One URL per branch** — e.g. `https://preview.example.com/feature-xyz/`
+- **Queue when full** — excess deploys stay registered as `waiting` until you pause or remove an instance
+- **Pause / resume / redeploy** — from the dashboard, without losing the database record
+- **Teardown on PR close** — optional workflow removes the instance automatically
+
+### Instance states
+
+| Status | Meaning |
+|--------|---------|
+| `active` | Running on the host (PM2 + nginx) |
+| `waiting` | Registered, waiting for a free slot |
+| `deploying` | Deploy job in progress |
+| `paused` | Stopped on the host, still in the database |
+| `error` | Last deploy or activate failed |
+
+## Architecture (short)
+
+- **`core/`** — Bash scripts: clone, build, PM2, nginx locations, pause, destroy  
+- **`server/`** — NestJS API, Postgres, BullMQ/Redis job queue  
+- **`front/`** — Next.js dashboard (instances, projects, setup guides)  
+
+Deploy is triggered with `POST /deploy` (API key). The API either runs the core script or queues the instance.
+
+## Configuration
+
+Main file: `server/.env` (created from `.env.example` on install).
+
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | Postgres (default: `postgresql://postgres:deployer@localhost:5432/deployer`) |
+| `REDIS_HOST` / `REDIS_PORT` | Redis for BullMQ |
+| `DEPLOYER_WORK_ROOT` | Where branch checkouts live on disk |
+| `DEPLOYER_CORE_DIR` | Path to `core/` |
+| `JWT_SECRET` | Auth tokens |
+| `TYPEORM_SYNC` | `true` for dev schema sync |
+
+Skip or automate admin user creation:
+
+```bash
+DEPLOYER_SKIP_SEED_USER=1 deployer setup
+DEPLOYER_SEED_EMAIL=you@example.com DEPLOYER_SEED_PASSWORD=yourpassword deployer setup
+```
+
+## CLI reference
+
+```bash
+deployer setup          # start stack
+deployer down           # stop stack (confirmation)
 deployer restart        # down + setup
-deployer status         # containers Docker + PM2
-deployer logs api       # logs da API
-deployer logs front     # logs do front
-deployer update         # git pull no diretório de instalação
-deployer help
+deployer status         # Docker + PM2
+deployer logs api       # API logs
+deployer logs front     # front container logs
+deployer update         # git pull install dir
 ```
 
-Pular confirmação ao derrubar: `deployer down -y` ou `DEPLOYER_YES=1 deployer down`.
+Installer env vars: `DEPLOYER_INSTALL_DIR`, `DEPLOYER_REPO_URL`.
 
-Variáveis do instalador:
+## License
 
-- `DEPLOYER_INSTALL_DIR` — destino do clone (padrão `~/deployer`)
-- `DEPLOYER_REPO_URL` — URL do repositório git
-
-## Ambiente local (Docker + PM2)
-
-Este repositório pode ser iniciado localmente com:
-
-- Postgres + Redis no Docker
-- Front (Next.js) no Docker
-- API (NestJS) no PM2 (no host)
-
-### Pré-requisitos
-
-- Docker (com `docker compose`)
-- Node.js 22+ (com `npm` no PATH)
-
-`pnpm` e `pm2` **não precisam** estar instalados globalmente: o script usa `npx pnpm@10` e `npx pm2` como fallback.
-
-### Subir tudo
-
-1) Ajuste o `server/.env` (se necessário). Por padrão ele já aponta para:
-
-- `DATABASE_URL=postgresql://postgres:deployer@localhost:5432/deployer`
-- `REDIS_HOST=localhost`
-- `REDIS_PORT=6480` (o script pode usar outra porta se `6480` estiver ocupada)
-- `TYPEORM_SYNC=true`
-
-2) Rode:
-
-```bash
-deployer setup
-# ou, a partir do clone: ./scripts/dev-up.sh
-```
-
-O script pergunta **e-mail e senha** do usuário admin e cadastra no Postgres.
-
-Para pular ou automatizar:
-
-```bash
-# não perguntar / não criar usuário
-DEPLOYER_SKIP_SEED_USER=1 ./scripts/dev-up.sh
-
-# credenciais sem prompt
-DEPLOYER_SEED_EMAIL=admin@exemplo.com DEPLOYER_SEED_PASSWORD=senha12345 ./scripts/dev-up.sh
-```
-
-Endpoints:
-
-- API: `http://localhost:3000`
-- Front: `http://localhost:3001`
-
-### Derrubar tudo
-
-```bash
-deployer down
-# ou: ./scripts/dev-down.sh
-```
-
-## Variáveis de ambiente (API)
-
-Arquivo: `server/.env`
-
-- **`DATABASE_URL`**: conexão Postgres (ex.: `postgresql://postgres:deployer@localhost:5432/deployer`)
-- **`REDIS_HOST`** / **`REDIS_PORT`**: Redis (BullMQ)
-- **`PORT`**: porta da API (padrão `3000`)
-- **`JWT_SECRET`**: segredo para assinar tokens
-- **`TYPEORM_SYNC`**: `true` para sincronizar schema automaticamente (dev)
-- **`DEPLOYER_WORK_ROOT`**: diretório onde ficam checkouts/builds das branches
-- **`DEPLOYER_CORE_DIR`**: caminho para `core/`
-- **`CORS_ORIGIN`**: origens permitidas (ex.: `http://localhost:3001`)
-
-## Nginx (host)
-
-O core escreve arquivos `*.location` em `DEPLOYER_LOCATIONS_DIR` (por padrão `~/deployer/locations`) e faz reload do nginx.
-Use `core/bin/setup-nginx.sh <domínio>` para gerar um snippet do `server {}` com `include .../*.location`.
-
+See repository license file when added. Built for teams who want simple, self-hosted preview environments.
