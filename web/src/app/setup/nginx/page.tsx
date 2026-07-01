@@ -29,8 +29,19 @@ export default function SetupNginxPage() {
             </section>
 
             <section>
-              <h2 className="font-medium text-[#e8eaed]">2. Generate server snippet</h2>
-              <p className="mt-2">On the deployer host:</p>
+              <h2 className="font-medium text-[#e8eaed]">2. Wire locations into nginx</h2>
+              <p className="mt-2">On the deployer host, add the include line to an existing site config:</p>
+              <pre className="mt-2 overflow-x-auto rounded border border-[#3d4048] bg-[#2b2e33] p-3 text-xs text-[#d1d5db]">
+{`deployer setup nginx`}
+              </pre>
+              <p className="mt-2">
+                Lists files in <code className="text-xs">sites-enabled</code>, lets you pick one, and
+                adds <code className="text-xs">include .../*.location;</code> inside the{' '}
+                <code className="text-xs">server {'{}'}</code> block if it is not already there.
+              </p>
+              <p className="mt-2">
+                Or generate a full server snippet for a new domain:
+              </p>
               <pre className="mt-2 overflow-x-auto rounded border border-[#3d4048] bg-[#2b2e33] p-3 text-xs text-[#d1d5db]">
 {`export DEPLOYER_WORK_ROOT=/path/to/work
 ./core/bin/setup-nginx.sh your-domain.com`}

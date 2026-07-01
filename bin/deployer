@@ -49,7 +49,15 @@ confirm_down() {
 }
 
 case "$cmd" in
-  setup|up|start)
+  setup)
+    sub="${1:-}"
+    if [[ "$sub" == "nginx" ]]; then
+      shift
+      exec bash "${ROOT}/scripts/setup-nginx.sh" "$@"
+    fi
+    exec bash "${ROOT}/scripts/dev-up.sh" "$@"
+    ;;
+  up|start)
     exec bash "${ROOT}/scripts/dev-up.sh" "$@"
     ;;
   down|stop)
@@ -148,6 +156,7 @@ Usage: deployer <command> [options]
 
 Commands:
   setup, up, start   Start Postgres, Redis, web (Docker) and API (PM2)
+  setup nginx        Add deployer locations include to a sites-enabled config
   down, stop         Stop API and containers (asks for confirmation)
   restart            down + setup (asks for confirmation)
   status             Show container and API status
