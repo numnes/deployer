@@ -10,7 +10,9 @@ Also useful if you search for: **feature-branch environments**, **dynamic enviro
 
 Each branch gets its own checkout, PM2 process, and nginx route (`/{branch-slug}/`). The dashboard shows active, waiting, paused, and failed instances; a global **slot limit** queues excess deploys until a preview is torn down. Teardown on PR close is supported via workflow.
 
-Self-host on a single machine — no Kubernetes required.
+Self-host on a single machine — no Kubernetes required today.
+
+> **Coming soon:** runtime backends for **Docker** and **Kubernetes**, so preview environments can run as containers or in a cluster — in addition to the current PM2 + nginx model on a single host.
 
 ## Quick start
 
@@ -220,6 +222,8 @@ Self-hosted **preview environment controller** on a single host — no Kubernete
 - **`web/`** — Next.js dashboard (instances, projects, setup guides)  
 
 Deploy is triggered with `POST /deploy` (API key), typically from GitHub Actions on pull request open/update. The API queues or runs the core script; closing the PR can call `POST /deploy/destroy` for automatic cleanup.
+
+**Roadmap:** Docker and Kubernetes runtimes for preview instances (coming soon). Today, deploys target the host directly via PM2.
 
 ## Configuration
 
