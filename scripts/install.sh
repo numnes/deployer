@@ -11,7 +11,7 @@
 set -euo pipefail
 
 INSTALL_DIR="${DEPLOYER_INSTALL_DIR:-${HOME}/deployer}"
-REPO_URL="${DEPLOYER_REPO_URL:-git@github.com:numnes/deployer.git}"
+REPO_URL="${DEPLOYER_REPO_URL:-https://github.com/numnes/deployer.git}"
 BIN_DIR="${DEPLOYER_BIN_DIR:-${HOME}/.local/bin}"
 CONFIG_DIR="${HOME}/.config/deployer"
 
