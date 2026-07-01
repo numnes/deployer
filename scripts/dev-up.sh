@@ -62,8 +62,12 @@ bash "${ROOT_DIR}/scripts/ensure-api-env.sh" \
 export POSTGRES_PUBLISH_PORT REDIS_PUBLISH_PORT WEB_PUBLISH_PORT
 export NEXT_PUBLIC_API_URL="http://localhost:${API_PORT}"
 
-echo "[dev-up] Starting Postgres/Redis/Web in Docker..."
-compose up -d --build postgres redis web
+echo "[dev-up] Starting Postgres/Redis in Docker..."
+compose up -d postgres redis
+
+echo "[dev-up] Building web container (no cache)..."
+compose build --no-cache web
+compose up -d web
 
 echo "[dev-up] Waiting for Postgres to become healthy..."
 postgres_ok=false
