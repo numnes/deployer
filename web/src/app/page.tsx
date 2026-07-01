@@ -3,24 +3,87 @@
 import { PageContainer } from '@/components/PageContainer';
 import { PageHeader } from '@/components/PageHeader';
 import { RequireAuth } from '@/components/RequireAuth';
-import { useEffect, useState } from 'react';
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
+  IconCpu,
+  IconDisk,
+  IconMemory,
+  IconStatusActive,
+  IconStatusDeploying,
+  IconStatusError,
+  IconStatusPaused,
+  IconStatusWaiting,
+} from '@/components/icons';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import {
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
-  XAxis,
-  YAxis,
 } from 'recharts';
 import { fetchDashboardSummary, type DashboardSummary } from './::handlers/dashboard';
 
-const STATUS_LABEL: Record<string, string> = {
-  waiting: 'Waiting',
-  deploying: 'Deploying',
-  active: 'Active',
-  paused: 'Paused',
-  error: 'Error',
+const STATUS_ORDER = ['waiting', 'deploying', 'active', 'paused', 'error'] as const;
+
+const STATUS_CONFIG: Record<
+  (typeof STATUS_ORDER)[number],
+  {
+    label: string;
+    icon: typeof IconStatusWaiting;
+    card: string;
+    border: string;
+    iconColor: string;
+    valueColor: string;
+    labelColor: string;
+  }
+> = {
+  waiting: {
+    label: 'Waiting',
+    icon: IconStatusWaiting,
+    card: 'bg-sky-500/10',
+    border: 'border-sky-500/25',
+    iconColor: 'text-sky-400',
+    valueColor: 'text-sky-300',
+    labelColor: 'text-sky-400/80',
+  },
+  deploying: {
+    label: 'Deploying',
+    icon: IconStatusDeploying,
+    card: 'bg-amber-500/10',
+    border: 'border-amber-500/25',
+    iconColor: 'text-amber-400',
+    valueColor: 'text-amber-300',
+    labelColor: 'text-amber-400/80',
+  },
+  active: {
+    label: 'Active',
+    icon: IconStatusActive,
+    card: 'bg-emerald-500/10',
+    border: 'border-emerald-500/25',
+    iconColor: 'text-emerald-400',
+    valueColor: 'text-emerald-300',
+    labelColor: 'text-emerald-400/80',
+  },
+  paused: {
+    label: 'Paused',
+    icon: IconStatusPaused,
+    card: 'bg-violet-500/10',
+    border: 'border-violet-500/25',
+    iconColor: 'text-violet-400',
+    valueColor: 'text-violet-300',
+    labelColor: 'text-violet-400/80',
+  },
+  error: {
+    label: 'Error',
+    icon: IconStatusError,
+    card: 'bg-rose-500/10',
+    border: 'border-rose-500/25',
+    iconColor: 'text-rose-400',
+    valueColor: 'text-rose-300',
+    labelColor: 'text-rose-400/80',
+  },
 };
 
 function formatBytes(n: number): string {
@@ -34,6 +97,17 @@ function formatBytes(n: number): string {
   }
   const digits = i === 0 ? 0 : i <= 2 ? 0 : 1;
   return `${v.toFixed(digits)} ${units[i]}`;
+}
+
+function usageTextColor(pct: number): string {
+  if (pct >= 85) return 'text-rose-400';
+  if (pct >= 65) return 'text-amber-400';
+  return 'text-emerald-400';
+}
+
+function cpuLoadPct(loadavg1: number, cores: number): number {
+  if (!cores || cores <= 0) return 0;
+  return Math.min(100, Math.round((loadavg1 / cores) * 100));
 }
 
 export default function HomePage() {
@@ -57,13 +131,20 @@ export default function HomePage() {
     };
   }, []);
 
-  const chartData =
+  const cpuPct =
+    data != null ? cpuLoadPct(data.host.cpu.loadavg1, data.host.cpu.cores) : null;
+
+  const activeCount = data?.instancesByStatus.active ?? 0;
+  const maxSlots = data?.maxActiveInstances ?? 0;
+  const availableSlots = Math.max(0, maxSlots - activeCount);
+  const slotUsagePct = maxSlots > 0 ? Math.round((activeCount / maxSlots) * 100) : 0;
+
+  const slotPieData =
     data != null
-      ? Object.entries(data.instancesByStatus).map(([key, value]) => ({
-          name: STATUS_LABEL[key] ?? key,
-          key,
-          value,
-        }))
+      ? [
+          { name: 'Active', value: activeCount, fill: '#34d399' },
+          { name: 'Available', value: availableSlots, fill: '#4b5563' },
+        ].filter((slice) => slice.value > 0)
       : [];
 
   return (
@@ -82,8 +163,15 @@ export default function HomePage() {
             </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                <div className="text-xs text-white/55">CPU (loadavg)</div>
-                <div className="mt-1 text-lg font-semibold text-white/90">
+                <div className="flex items-center gap-2 text-xs text-white/55">
+                  <IconCpu className="h-4 w-4 text-sky-400/80" />
+                  CPU (loadavg)
+                </div>
+                <div
+                  className={`mt-2 text-lg font-semibold ${
+                    cpuPct != null ? usageTextColor(cpuPct) : 'text-white/90'
+                  }`}
+                >
                   {data
                     ? `${data.host.cpu.loadavg1.toFixed(2)} / ${data.host.cpu.loadavg5.toFixed(
                         2,
@@ -91,12 +179,21 @@ export default function HomePage() {
                     : '—'}
                 </div>
                 <div className="mt-1 text-xs text-white/55">
-                  {data ? `${data.host.cpu.cores} cores` : ''}
+                  {data
+                    ? `${data.host.cpu.cores} cores · ~${cpuPct}% load (1m)`
+                    : ''}
                 </div>
               </div>
               <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                <div className="text-xs text-white/55">Memory</div>
-                <div className="mt-1 text-lg font-semibold text-white/90">
+                <div className="flex items-center gap-2 text-xs text-white/55">
+                  <IconMemory className="h-4 w-4 text-violet-400/80" />
+                  Memory
+                </div>
+                <div
+                  className={`mt-2 text-lg font-semibold ${
+                    data != null ? usageTextColor(data.host.memory.usedPct) : 'text-white/90'
+                  }`}
+                >
                   {data ? `${data.host.memory.usedPct}%` : '—'}
                 </div>
                 <div className="mt-1 text-xs text-white/55">
@@ -108,8 +205,15 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                <div className="text-xs text-white/55">Disk ({data?.host.disk.path ?? '—'})</div>
-                <div className="mt-1 text-lg font-semibold text-white/90">
+                <div className="flex items-center gap-2 text-xs text-white/55">
+                  <IconDisk className="h-4 w-4 text-amber-400/80" />
+                  Disk ({data?.host.disk.path ?? '—'})
+                </div>
+                <div
+                  className={`mt-2 text-lg font-semibold ${
+                    data != null ? usageTextColor(data.host.disk.usedPct) : 'text-white/90'
+                  }`}
+                >
                   {data ? `${data.host.disk.usedPct}%` : '—'}
                 </div>
                 <div className="mt-1 text-xs text-white/55">
@@ -122,22 +226,77 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-          <div className="card p-5">
+
+          <div className="card p-5 lg:col-span-2">
             <h2 className="text-base font-semibold text-[#e8eaed]">Instances by status</h2>
             <p className="mt-1 text-sm text-[#8b919a]">
-              Configured limit:{' '}
-              <span className="font-semibold text-white/90">
-                {data?.maxActiveInstances ?? '—'}
-              </span>{' '}
-              active max.
+              Number of preview instances in each status across all projects.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-5">
+              {STATUS_ORDER.map((status) => {
+                const cfg = STATUS_CONFIG[status];
+                const Icon = cfg.icon;
+                const count = data?.instancesByStatus[status] ?? 0;
+                return (
+                  <Link
+                    key={status}
+                    href={`/instances?status=${status}`}
+                    className={`flex aspect-square flex-col items-center justify-center rounded-xl border p-3 transition hover:brightness-110 ${cfg.card} ${cfg.border}`}
+                  >
+                    <Icon className={`h-5 w-5 ${cfg.iconColor}`} />
+                    <div className={`mt-2 text-2xl font-bold tabular-nums ${cfg.valueColor}`}>
+                      {data != null ? count : '—'}
+                    </div>
+                    <div className={`mt-0.5 text-center text-[11px] font-medium ${cfg.labelColor}`}>
+                      {cfg.label}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="card p-5">
+            <h2 className="text-base font-semibold text-[#e8eaed]">Active slot usage</h2>
+            <p className="mt-1 text-sm text-[#8b919a]">
+              {data != null ? (
+                <>
+                  <span className={`font-semibold ${usageTextColor(slotUsagePct)}`}>
+                    {activeCount}
+                  </span>{' '}
+                  of{' '}
+                  <span className="font-semibold text-white/90">{maxSlots}</span> slots in use (
+                  {slotUsagePct}%).
+                </>
+              ) : (
+                'Active instances vs configured capacity.'
+              )}
             </p>
             <div className="mt-4 h-64">
-              {chartData.length > 0 ? (
+              {data == null ? (
+                <p className="text-sm text-white/55">Loading…</p>
+              ) : maxSlots <= 0 ? (
+                <p className="text-sm text-white/55">No active slot limit configured.</p>
+              ) : slotPieData.length === 0 ? (
+                <p className="text-sm text-white/55">No slot data yet.</p>
+              ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                    <XAxis dataKey="name" tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }} />
-                    <YAxis allowDecimals={false} tick={{ fill: 'rgba(255,255,255,0.65)', fontSize: 11 }} />
+                  <PieChart>
+                    <Pie
+                      data={slotPieData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={52}
+                      outerRadius={80}
+                      paddingAngle={slotPieData.length > 1 ? 2 : 0}
+                      stroke="rgba(255,255,255,0.08)"
+                    >
+                      {slotPieData.map((entry) => (
+                        <Cell key={entry.name} fill={entry.fill} />
+                      ))}
+                    </Pie>
                     <Tooltip
                       contentStyle={{
                         background: '#0f172a',
@@ -145,15 +304,24 @@ export default function HomePage() {
                         borderRadius: 8,
                       }}
                       labelStyle={{ color: 'rgba(255,255,255,0.85)' }}
+                      formatter={(value: number, name: string) => {
+                        const pct = maxSlots > 0 ? Math.round((value / maxSlots) * 100) : 0;
+                        return [`${value} (${pct}%)`, name];
+                      }}
                     />
-                    <Bar dataKey="value" fill="#6b7280" radius={[4, 4, 0, 0]} />
-                  </BarChart>
+                    <Legend
+                      verticalAlign="bottom"
+                      iconType="circle"
+                      formatter={(value) => (
+                        <span className="text-sm text-white/70">{value}</span>
+                      )}
+                    />
+                  </PieChart>
                 </ResponsiveContainer>
-              ) : (
-                <p className="text-sm text-white/55">No data yet.</p>
               )}
             </div>
           </div>
+
           <div className="card p-5">
             <h2 className="text-base font-semibold text-[#e8eaed]">Recent project activity</h2>
             <p className="mt-1 text-sm text-[#8b919a]">
@@ -176,6 +344,7 @@ export default function HomePage() {
               ) : null}
             </ul>
           </div>
+
           <div className="card p-5 lg:col-span-2">
             <h2 className="text-base font-semibold text-[#e8eaed]">Recent status changes</h2>
             <div className="mt-3 overflow-x-auto">
