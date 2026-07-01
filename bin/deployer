@@ -63,6 +63,19 @@ case "$cmd" in
     ;;
   status)
     echo "=== Deployer ($ROOT) ==="
+    ENV_FILE="${ROOT}/server/.env"
+    if [[ -f "$ENV_FILE" ]]; then
+      api_port="$(grep -E '^PORT=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
+      front_port="$(grep -E '^CORS_ORIGIN=' "$ENV_FILE" 2>/dev/null | tail -1 | sed 's/.*://' | tr -d '[:space:]')"
+      pg_port="$(grep -E '^DATABASE_URL=' "$ENV_FILE" 2>/dev/null | tail -1 | sed -n 's/.*:\([0-9]*\)\/deployer.*/\1/p')"
+      redis_port="$(grep -E '^REDIS_PORT=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
+      echo ""
+      echo "Ports (from server/.env):"
+      echo "  API:      ${api_port:-?}"
+      echo "  Front:    ${front_port:-?}"
+      echo "  Postgres: ${pg_port:-?}"
+      echo "  Redis:    ${redis_port:-?}"
+    fi
     echo ""
     echo "Docker:"
     if docker ps -a --filter 'name=deployer-' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null | grep -q deployer; then

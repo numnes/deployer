@@ -1,3 +1,7 @@
+import { patchEmptyEnvFromFile } from './load-env';
+
+patchEmptyEnvFromFile();
+
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
@@ -10,6 +14,9 @@ async function bootstrap() {
     /^https?:\/\/localhost:3\d*$/,
     /^https?:\/\/127\.0\.0\.1:3\d*$/,
     /^https?:\/\/\[::1\]:3\d*$/,
+    /^http?:\/\/127\.0\.0\.1:3\d*$/,
+    /^http?:\/\/localhost:3\d*$/,
+    /^http?:\/\/\[::1\]:3\d*$/,
   ];
 
   const corsOriginEnv =

@@ -23,8 +23,8 @@ deployer setup    # Postgres + Redis + front (Docker) + API (PM2)
 deployer status   # check services
 ```
 
-- **Dashboard:** http://localhost:3001  
-- **API / Swagger:** http://localhost:3000/docs  
+- **Dashboard:** http://localhost:3001 (or the port shown after `deployer setup`)  
+- **API / Swagger:** http://localhost:3000/docs (API port may differ if 3000 is busy)  
 
 On first setup you'll be prompted for an admin email and password.
 
@@ -79,15 +79,18 @@ Deploy is triggered with `POST /deploy` (API key). The API either runs the core 
 
 ## Configuration
 
-Main file: `server/.env` (created from `.env.example` on install).
+Main file: `server/.env` — **generated automatically** on `deployer setup` with Postgres/Redis/API/front ports, a random `JWT_SECRET`, and `DEPLOYER_ALLOW_REGISTER=false`. Connection ports are picked from free local ports when defaults (3000, 3001, 5432, 6480) are in use. Re-running `setup` updates connection settings but keeps an existing `JWT_SECRET`.
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | Postgres (default: `postgresql://postgres:deployer@localhost:5432/deployer`) |
+| `PORT` | API listen port (default 3000) |
+| `DATABASE_URL` | Postgres (`postgresql://postgres:deployer@localhost:<port>/deployer`) |
 | `REDIS_HOST` / `REDIS_PORT` | Redis for BullMQ |
+| `CORS_ORIGIN` | Front URL allowed by the API |
 | `DEPLOYER_WORK_ROOT` | Where branch checkouts live on disk |
 | `DEPLOYER_CORE_DIR` | Path to `core/` |
-| `JWT_SECRET` | Auth tokens |
+| `JWT_SECRET` | Auth tokens (auto-generated on first setup) |
+| `DEPLOYER_ALLOW_REGISTER` | Public sign-up (`false` by default after setup) |
 | `TYPEORM_SYNC` | `true` for dev schema sync |
 
 Skip or automate admin user creation:

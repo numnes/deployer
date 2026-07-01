@@ -17,7 +17,8 @@ function loadDatabaseUrl() {
     const line = fs
       .readFileSync(ENV_PATH, 'utf8')
       .split('\n')
-      .find((l) => l.startsWith('DATABASE_URL='));
+      .filter((l) => l.startsWith('DATABASE_URL='))
+      .pop();
     if (line) {
       const val = line.slice('DATABASE_URL='.length).trim();
       if (val) return val;

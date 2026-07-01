@@ -24,9 +24,16 @@ import { UsersModule } from './users/users.module';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
+      useFactory: (config: ConfigService) => {
+        const url = config.get<string>('DATABASE_URL')?.trim();
+        if (!url) {
+          throw new Error(
+            'DATABASE_URL is missing or empty. Check server/.env and restart with: deployer down -y && deployer setup',
+          );
+        }
+        return {
         type: 'postgres',
-        url: config.get<string>('DATABASE_URL'),
+        url,
         entities: [
           User,
           ApiKey,
@@ -37,7 +44,8 @@ import { UsersModule } from './users/users.module';
         ],
         synchronize: config.get<string>('TYPEORM_SYNC') === 'true',
         logging: false,
-      }),
+      };
+      },
     }),
     BullModule.forRootAsync({
       imports: [ConfigModule],

@@ -11,7 +11,7 @@
 set -euo pipefail
 
 INSTALL_DIR="${DEPLOYER_INSTALL_DIR:-${HOME}/deployer}"
-REPO_URL="${DEPLOYER_REPO_URL:-https://github.com/numnes/deployer.git}"
+REPO_URL="${DEPLOYER_REPO_URL:-git@github.com:numnes/deployer.git}"
 BIN_DIR="${DEPLOYER_BIN_DIR:-${HOME}/.local/bin}"
 CONFIG_DIR="${HOME}/.config/deployer"
 
@@ -50,7 +50,7 @@ log "Executable: ${LINK} → ${INSTALL_DIR}/bin/deployer"
 if [[ ! -f "${INSTALL_DIR}/server/.env" ]]; then
   if [[ -f "${INSTALL_DIR}/server/.env.example" ]]; then
     cp "${INSTALL_DIR}/server/.env.example" "${INSTALL_DIR}/server/.env"
-    log "Created server/.env from .env.example"
+    log "Created server/.env from .env.example (deployer setup will finalize it)"
   fi
 fi
 

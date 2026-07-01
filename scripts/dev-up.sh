@@ -2,36 +2,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/ports.sh
+source "${ROOT_DIR}/scripts/lib/ports.sh"
 
 compose() {
   docker compose -f "${ROOT_DIR}/docker-compose.dev.yml" "$@"
-}
-
-port_in_use() {
-  local port="$1"
-  ss -tuln 2>/dev/null | grep -q ":${port} "
-}
-
-pick_redis_port() {
-  local preferred="${1:-6480}"
-  local existing
-  existing="$(docker port deployer-redis 6379/tcp 2>/dev/null | head -1 | sed 's/.*://')"
-  if [[ -n "$existing" ]]; then
-    echo "$existing"
-    return
-  fi
-  if ! port_in_use "$preferred"; then
-    echo "$preferred"
-    return
-  fi
-  for port in 6380 6381 6382 6481 6482; do
-    if ! port_in_use "$port"; then
-      echo "$port"
-      return
-    fi
-  done
-  echo "No free port for Redis (try freeing 6480 or 6380)." >&2
-  exit 1
 }
 
 wait_for_http() {
@@ -51,13 +26,41 @@ wait_for_http() {
   return 1
 }
 
-REDIS_PUBLISH_PORT="$(pick_redis_port "${REDIS_PUBLISH_PORT:-6480}")"
-export REDIS_PUBLISH_PORT
-if docker ps --format '{{.Names}}' | grep -qx deployer-redis; then
-  echo "[dev-up] Deployer Redis on localhost:${REDIS_PUBLISH_PORT}"
-elif [[ "$REDIS_PUBLISH_PORT" != "6480" ]]; then
-  echo "[dev-up] Port 6480 in use; Redis published on ${REDIS_PUBLISH_PORT}"
-fi
+stop_api_for_port_scan() {
+  if command -v pm2 >/dev/null 2>&1; then
+    pm2 delete deployer-api >/dev/null 2>&1 || true
+  else
+    npx --yes pm2 delete deployer-api >/dev/null 2>&1 || true
+  fi
+}
+
+echo "[dev-up] Resolving ports..."
+stop_api_for_port_scan
+
+POSTGRES_PUBLISH_PORT="$(pick_port 5432 deployer-postgres 5432 5433 5434 5435 5436 5440 5450)"
+REDIS_PUBLISH_PORT="$(pick_port 6480 deployer-redis 6379 6380 6381 6382 6481 6482 6483)"
+API_PORT="$(pick_port 3000 "" "" 3002 3003 3004 3005 3010 3020 3030)"
+FRONT_PUBLISH_PORT="$(pick_port 3001 deployer-front 3000 3002 3003 3004 3005 3011 3021 3031)"
+
+for pair in \
+  "Postgres:${POSTGRES_PUBLISH_PORT}:5432" \
+  "Redis:${REDIS_PUBLISH_PORT}:6480" \
+  "API:${API_PORT}:3000" \
+  "Front:${FRONT_PUBLISH_PORT}:3001"; do
+  IFS=: read -r label port default <<< "$pair"
+  if [[ "$port" != "$default" ]]; then
+    echo "[dev-up] Port ${default} in use; ${label} on ${port}"
+  fi
+done
+
+bash "${ROOT_DIR}/scripts/ensure-server-env.sh" \
+  --api-port "$API_PORT" \
+  --postgres-port "$POSTGRES_PUBLISH_PORT" \
+  --redis-port "$REDIS_PUBLISH_PORT" \
+  --front-port "$FRONT_PUBLISH_PORT"
+
+export POSTGRES_PUBLISH_PORT REDIS_PUBLISH_PORT FRONT_PUBLISH_PORT
+export NEXT_PUBLIC_API_URL="http://localhost:${API_PORT}"
 
 echo "[dev-up] Starting Postgres/Redis/Front in Docker..."
 compose up -d --build postgres redis front
@@ -101,12 +104,8 @@ bash "${ROOT_DIR}/scripts/seed-default-user.sh"
 
 pushd "${ROOT_DIR}/server" >/dev/null
 set -a
-if [[ -f ".env" ]]; then
-  # shellcheck disable=SC1091
-  source ".env"
-fi
-export REDIS_HOST="${REDIS_HOST:-localhost}"
-export REDIS_PORT="${REDIS_PUBLISH_PORT}"
+# shellcheck disable=SC1091
+source ".env"
 set +a
 
 "${PM2[@]}" delete deployer-api >/dev/null 2>&1 || true
@@ -115,11 +114,12 @@ popd >/dev/null
 
 echo ""
 echo "[dev-up] OK"
-echo "  - API:   http://localhost:${PORT:-3000} (PM2: deployer-api)"
-echo "  - Front: http://localhost:3001 (Docker: deployer-front)"
+echo "  - API:   http://localhost:${API_PORT} (PM2: deployer-api)"
+echo "  - Front: http://localhost:${FRONT_PUBLISH_PORT} (Docker: deployer-front)"
+echo "  - Postgres: localhost:${POSTGRES_PUBLISH_PORT}"
 echo "  - Redis: localhost:${REDIS_PUBLISH_PORT}"
 echo ""
 
-api_code="$(wait_for_http "http://localhost:${PORT:-3000}/docs" "API" || true)"
-front_code="$(wait_for_http "http://localhost:3001/" "Front" || true)"
+api_code="$(wait_for_http "http://localhost:${API_PORT}/docs" "API" || true)"
+front_code="$(wait_for_http "http://localhost:${FRONT_PUBLISH_PORT}/" "Front" || true)"
 echo "[dev-up] Health check: API /docs=${api_code}, Front=${front_code}"

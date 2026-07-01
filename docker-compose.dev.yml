@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: deployer
       POSTGRES_DB: deployer
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PUBLISH_PORT:-5432}:5432"
     volumes:
       - deployer_pg:/var/lib/postgresql/data
     healthcheck:
@@ -30,11 +30,10 @@ services:
       context: ./front
       dockerfile: Dockerfile
       args:
-        # URL da api
-        NEXT_PUBLIC_API_URL: http://localhost:3000
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000}
     container_name: deployer-front
     ports:
-      - "3001:3000"
+      - "${FRONT_PUBLISH_PORT:-3001}:3000"
     environment:
       NODE_ENV: production
     depends_on:
