@@ -1,8 +1,10 @@
 import {
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
   BadRequestException,
+  forwardRef,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { execFile } from 'child_process';
@@ -54,6 +56,7 @@ export class PreviewInstancesService {
     private readonly repo: Repository<PreviewInstance>,
     @InjectRepository(PreviewInstanceStatusEvent)
     private readonly events: Repository<PreviewInstanceStatusEvent>,
+    @Inject(forwardRef(() => ProjectsService))
     private readonly projects: ProjectsService,
     private readonly settings: SettingsService,
     private readonly config: ConfigService,
