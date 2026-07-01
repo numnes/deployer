@@ -121,7 +121,7 @@ export default function ProjectsPage() {
                   setImportJson(e.target.value);
                   setImportError(null);
                 }}
-                placeholder='{"version":1,"kind":"deployer-project-registration","project":{"slug":"my-app","gitUrl":"https://github.com/org/repo.git"}}'
+                placeholder='{"slug":"my-app","gitUrl":"https://github.com/org/repo.git","serverUrl":"https://preview.example.com"}'
               />
               {importError ? <div className="alert-error mt-2">{importError}</div> : null}
               <div className="mt-3 flex flex-wrap gap-2">

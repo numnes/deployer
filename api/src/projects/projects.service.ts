@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Project } from '../entities/project.entity';
+import { PreviewInstancesService } from '../preview-instances/preview-instances.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 
 @Injectable()
@@ -9,6 +10,8 @@ export class ProjectsService {
   constructor(
     @InjectRepository(Project)
     private readonly repo: Repository<Project>,
+    @Inject(forwardRef(() => PreviewInstancesService))
+    private readonly previewInstances: PreviewInstancesService,
   ) {}
 
   create(dto: CreateProjectDto) {
@@ -48,5 +51,22 @@ export class ProjectsService {
     const trimmed = serverUrl?.trim();
     p.serverUrl = trimmed ? trimmed : null;
     return this.repo.save(p);
+  }
+
+  async deleteProject(id: string) {
+    await this.findOne(id);
+    const instances = await this.previewInstances.destroyAllForProject(id);
+    await this.repo.delete(id);
+    return { ok: true as const, instances };
+  }
+
+  async teardownAllInstances(id: string) {
+    await this.findOne(id);
+    return this.previewInstances.pauseAllActiveForProject(id);
+  }
+
+  async restartAllInstances(id: string) {
+    await this.findOne(id);
+    return this.previewInstances.restartAllForProject(id);
   }
 }

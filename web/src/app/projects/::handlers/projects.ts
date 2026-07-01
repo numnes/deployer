@@ -54,3 +54,43 @@ export async function patchProject(
   });
 }
 
+export type ProjectBulkResult = {
+  ok?: boolean;
+  destroyed?: number;
+  failed?: number;
+  paused?: number;
+  skipped?: number;
+  restarted?: number;
+  instances?: { destroyed: number; failed: number };
+};
+
+export async function deleteProject(id: string): Promise<ProjectBulkResult> {
+  const token = getTokenClient();
+  return await httpJson<ProjectBulkResult>(`${apiBaseClient()}/projects/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+export async function teardownProjectInstances(id: string): Promise<ProjectBulkResult> {
+  const token = getTokenClient();
+  return await httpJson<ProjectBulkResult>(
+    `${apiBaseClient()}/projects/${id}/instances/teardown`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+}
+
+export async function restartProjectInstances(id: string): Promise<ProjectBulkResult> {
+  const token = getTokenClient();
+  return await httpJson<ProjectBulkResult>(
+    `${apiBaseClient()}/projects/${id}/instances/restart`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    },
+  );
+}
+

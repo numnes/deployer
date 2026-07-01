@@ -413,4 +413,84 @@ export class PreviewInstancesService {
     const fresh = await this.repo.findOne({ where: { id }, relations: ['project'] });
     return this.buildListItem(fresh as PreviewInstance, pm2.get(fresh!.pm2Name));
   }
+
+  async findAllByProjectId(projectId: string): Promise<PreviewInstance[]> {
+    return this.repo.find({
+      where: { projectId },
+      relations: ['project'],
+      order: { updatedAt: 'DESC' },
+    });
+  }
+
+  async destroyAllForProject(projectId: string): Promise<{
+    destroyed: number;
+    failed: number;
+  }> {
+    const rows = await this.findAllByProjectId(projectId);
+    let destroyed = 0;
+    let failed = 0;
+    for (const row of rows) {
+      try {
+        await this.destroyInstanceById(row.id);
+        destroyed++;
+      } catch (e) {
+        failed++;
+        const msg = e instanceof Error ? e.message : String(e);
+        this.log.warn(`destroy ${row.id}: ${msg}`);
+      }
+    }
+    return { destroyed, failed };
+  }
+
+  async pauseAllActiveForProject(projectId: string): Promise<{
+    paused: number;
+    skipped: number;
+    failed: number;
+  }> {
+    const rows = await this.findAllByProjectId(projectId);
+    let paused = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const row of rows) {
+      if (row.status !== 'active') {
+        skipped++;
+        continue;
+      }
+      try {
+        await this.pauseInstance(row.id);
+        paused++;
+      } catch (e) {
+        failed++;
+        const msg = e instanceof Error ? e.message : String(e);
+        this.log.warn(`pause ${row.id}: ${msg}`);
+      }
+    }
+    return { paused, skipped, failed };
+  }
+
+  async restartAllForProject(projectId: string): Promise<{
+    restarted: number;
+    skipped: number;
+    failed: number;
+  }> {
+    const rows = await this.findAllByProjectId(projectId);
+    let restarted = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const row of rows) {
+      if (!['active', 'paused', 'waiting', 'error'].includes(row.status)) {
+        skipped++;
+        continue;
+      }
+      try {
+        await this.activateOrRedeployInstance(row.id);
+        restarted++;
+      } catch (e) {
+        failed++;
+        const msg = e instanceof Error ? e.message : String(e);
+        this.log.warn(`restart ${row.id}: ${msg}`);
+      }
+    }
+    return { restarted, skipped, failed };
+  }
 }

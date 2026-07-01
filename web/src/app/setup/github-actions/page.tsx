@@ -160,26 +160,18 @@ export default function SetupGithubActionsPage() {
                 <CodeBlock
                   title="Example registration JSON (printed by deployer project init)"
                   content={`{
-  "version": 1,
-  "kind": "deployer-project-registration",
-  "project": {
-    "slug": "my-app",
-    "gitUrl": "https://github.com/org/my-app.git",
-    "serverUrl": "https://preview.example.com"
-  },
-  "github": {
-    "variables": {
-      "DEPLOYER_PROJECT_SLUG": "my-app"
-    },
-    "secrets": ["DEPLOYER_API_URL", "DEPLOYER_API_KEY"]
-  }
+  "slug": "my-app",
+  "gitUrl": "https://github.com/org/my-app.git",
+  "serverUrl": "https://preview.example.com"
 }`}
                 />
               </div>
               <p className="mt-3 text-[#8b919a]">
-                Set GitHub variable <code className="text-xs">DEPLOYER_PROJECT_SLUG</code> to the
-                same slug. See <strong className="text-[#b8bcc4]">Setup → Secrets</strong> for
-                secrets and variables.
+                After importing, configure GitHub secrets{' '}
+                <code className="text-xs">DEPLOYER_API_URL</code> and{' '}
+                <code className="text-xs">DEPLOYER_API_KEY</code>, and variable{' '}
+                <code className="text-xs">DEPLOYER_PROJECT_SLUG</code> (same as slug). See{' '}
+                <strong className="text-[#b8bcc4]">Setup → Secrets</strong>.
               </p>
               <p className="mt-2 text-[#8b919a]">
                 Non-interactive overrides:{' '}

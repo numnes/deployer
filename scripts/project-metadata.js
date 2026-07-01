@@ -122,27 +122,9 @@ function registrationJson({ slug, gitUrl, serverUrl }) {
   }
 
   return {
-    version: 1,
-    kind: 'deployer-project-registration',
-    project: {
-      slug: trimmedSlug,
-      gitUrl: normalizeGitUrl(trimmedGit) || trimmedGit,
-      serverUrl: trimmedServer,
-    },
-    github: {
-      variables: {
-        DEPLOYER_PROJECT_SLUG: trimmedSlug,
-      },
-      secrets: ['DEPLOYER_API_URL', 'DEPLOYER_API_KEY'],
-    },
-    import: {
-      where: 'Dashboard → Projects → Add project → Import registration JSON',
-      steps: [
-        'Copy the JSON block printed by deployer project init',
-        'Open Projects in the deployer dashboard and click Add project',
-        'Paste the JSON into Import registration JSON and click Apply or Create from JSON',
-      ],
-    },
+    slug: trimmedSlug,
+    gitUrl: normalizeGitUrl(trimmedGit) || trimmedGit,
+    ...(trimmedServer ? { serverUrl: trimmedServer } : {}),
   };
 }
 

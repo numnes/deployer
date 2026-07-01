@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -54,5 +55,29 @@ export class ProjectsController {
     @Body() dto: UpdateProjectDto,
   ) {
     return this.projects.updateServerUrl(id, dto.serverUrl);
+  }
+
+  @ApiBearerAuth('jwt')
+  @ApiOkResponse({ description: 'Pausa todas as instâncias ativas do projeto' })
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/instances/teardown')
+  teardownInstances(@Param('id', ParseUUIDPipe) id: string) {
+    return this.projects.teardownAllInstances(id);
+  }
+
+  @ApiBearerAuth('jwt')
+  @ApiOkResponse({ description: 'Reinicia / redeploy de todas as instâncias do projeto' })
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/instances/restart')
+  restartInstances(@Param('id', ParseUUIDPipe) id: string) {
+    return this.projects.restartAllInstances(id);
+  }
+
+  @ApiBearerAuth('jwt')
+  @ApiOkResponse({ description: 'Remove projeto e todas as instâncias' })
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id')
+  delete(@Param('id', ParseUUIDPipe) id: string) {
+    return this.projects.deleteProject(id);
   }
 }
