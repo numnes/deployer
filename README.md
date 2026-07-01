@@ -1,12 +1,16 @@
 ![Deployer banner](assets/banner.png)
 
-# deployer | Preview environments by branch
+# deployer | Self-hosted preview & ephemeral environments
 
-**deployer** is a self-hosted tool to spin up **isolated preview environments for every branch** on your own server. Connect a GitHub Action, open a pull request, and get a live URL — without juggling servers by hand.
+**deployer** is a self-hosted platform for **preview environments**, **ephemeral environments**, and **review apps** — temporary, isolated deploys you spin up per **branch** or **pull request** on infrastructure you control.
 
-Each branch gets its own checkout, PM2 process, and nginx route (`/{branch-slug}/`). A web dashboard shows what's running, what's waiting in queue, and what's paused. You set a global limit on active instances; everything else waits until a slot opens.
+Open a PR, trigger a GitHub Action, and get a live **deploy preview** URL. No Vercel lock-in, no per-seat SaaS. One VPS (or bare metal), nginx, PM2, and a dashboard to manage what is running.
 
-Self-host it on a single machine. No SaaS signup required.
+Also useful if you search for: **feature-branch environments**, **dynamic environments**, **on-demand test environments**, **PR preview deployments**, or a lightweight **self-hosted alternative** to hosted preview/review-app services.
+
+Each branch gets its own checkout, PM2 process, and nginx route (`/{branch-slug}/`). The dashboard shows active, waiting, paused, and failed instances; a global **slot limit** queues excess deploys until a preview is torn down. Teardown on PR close is supported via workflow.
+
+Self-host on a single machine — no Kubernetes required.
 
 ## Quick start
 
@@ -186,30 +190,36 @@ The project slug is embedded in the workflow files when you run `deployer projec
 
 ## What you get
 
-- **One URL per branch** — e.g. `https://preview.example.com/feature-xyz/`
-- **Queue when full** — excess deploys stay registered as `waiting` until you pause or remove an instance
-- **Pause / resume / redeploy** — per instance in the dashboard, or **Restart all instances** on a project
-- **Teardown on PR close** — optional workflow removes the instance automatically
-- **Bulk teardown** — **Projects → Settings → Teardown all instances** pauses every active instance for a project
+Ephemeral **preview URLs** for code review and QA before merge:
+
+- **One URL per branch / PR** — e.g. `https://preview.example.com/feature-xyz/`
+- **Environment queue** — when the active slot limit is reached, new deploys stay `waiting` until a preview is paused or destroyed
+- **Pause / resume / redeploy** — per instance in the dashboard, or **Restart all instances** on a project  
+- **Teardown on PR close** — optional workflow removes the instance automatically  
+- **Bulk teardown** — **Projects → Settings → Teardown all instances** pauses every active instance for a project  
 - **Delete project** — removes the project and destroys all its instances (PM2, nginx, database)
 
 ### Instance states
 
+Preview / ephemeral environment lifecycle:
+
 | Status      | Meaning                                    |
 | ----------- | ------------------------------------------ |
-| `active`    | Running on the host (PM2 + nginx)          |
-| `waiting`   | Registered, waiting for a free slot        |
+| `active`    | Running on the host (PM2 + nginx) — live review app |
+| `waiting`   | Registered, waiting for a free slot (queued preview) |
 | `deploying` | Deploy job in progress                     |
 | `paused`    | Stopped on the host, still in the database |
 | `error`     | Last deploy or activate failed             |
 
 ## Architecture (short)
 
-- **`core/`** — Bash scripts: clone, build, PM2, nginx locations, pause, destroy
-- **`api/`** — NestJS API, Postgres, BullMQ/Redis job queue
-- **`web/`** — Next.js dashboard (instances, projects, setup guides)
+Self-hosted **preview environment controller** on a single host — no Kubernetes required:
 
-Deploy is triggered with `POST /deploy` (API key). The API either runs the core script or queues the instance.
+- **`core/`** — Bash scripts: clone, build, PM2, nginx locations, pause, destroy  
+- **`api/`** — NestJS API, Postgres, BullMQ/Redis job queue (deploy / teardown webhooks)  
+- **`web/`** — Next.js dashboard (instances, projects, setup guides)  
+
+Deploy is triggered with `POST /deploy` (API key), typically from GitHub Actions on pull request open/update. The API queues or runs the core script; closing the PR can call `POST /deploy/destroy` for automatic cleanup.
 
 ## Configuration
 
