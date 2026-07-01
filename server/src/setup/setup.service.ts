@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { execFile } from 'child_process';
-import { access, readdir } from 'fs/promises';
+import { access, readFile, readdir } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
 import { promisify } from 'util';
@@ -21,9 +21,25 @@ export type NginxCheckResult = {
   checks: NginxCheckItem[];
 };
 
+export type ProjectTemplateFile = {
+  path: string;
+  content: string;
+};
+
+export type ProjectTemplatesResult = {
+  cliCommand: string;
+  files: ProjectTemplateFile[];
+};
+
 @Injectable()
 export class SetupService {
   constructor(private readonly config: ConfigService) {}
+
+  private repoRoot(): string {
+    const core = this.config.get<string>('DEPLOYER_CORE_DIR');
+    if (core) return join(core, '..');
+    return join(homedir(), 'deployer');
+  }
 
   private locationsDir(): string {
     return (
@@ -148,6 +164,26 @@ export class SetupService {
       ok: criticalOk,
       locationsDir,
       checks,
+    };
+  }
+
+  async getProjectTemplates(): Promise<ProjectTemplatesResult> {
+    const root = this.repoRoot();
+    const specs = [
+      { path: '.github/workflows/deploy-preview.yml', src: join(root, 'actions', 'deploy-preview.yml') },
+      { path: '.github/workflows/teardown-preview.yml', src: join(root, 'actions', 'teardown-preview.yml') },
+      { path: 'deployer.yaml', src: join(root, 'examples', 'deployer.yaml') },
+    ];
+
+    const files: ProjectTemplateFile[] = [];
+    for (const spec of specs) {
+      const content = await readFile(spec.src, 'utf8');
+      files.push({ path: spec.path, content });
+    }
+
+    return {
+      cliCommand: 'deployer project init',
+      files,
     };
   }
 }

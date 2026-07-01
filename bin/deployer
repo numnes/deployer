@@ -113,7 +113,29 @@ case "$cmd" in
   update|pull)
     echo "[deployer] Updating repository at $ROOT..."
     git -C "$ROOT" pull --ff-only
-    echo "[deployer] OK"
+    deployer_in_path="$(command -v deployer 2>/dev/null || true)"
+    if [[ -n "$deployer_in_path" ]]; then
+      export DEPLOYER_BIN_DIR="$(dirname "$deployer_in_path")"
+    fi
+    bash "${ROOT}/scripts/sync-cli.sh"
+    echo "[deployer] OK — executable and scripts updated"
+    ;;
+  project)
+    sub="${1:-help}"
+    shift || true
+    case "$sub" in
+      init|setup)
+        exec bash "${ROOT}/scripts/project-init.sh" "$@"
+        ;;
+      help|-h|--help)
+        exec bash "${ROOT}/scripts/project-init.sh" --help
+        ;;
+      *)
+        echo "deployer: unknown project command: $sub" >&2
+        echo "Run: deployer project init --help" >&2
+        exit 1
+        ;;
+    esac
     ;;
   root|path)
     echo "$ROOT"
@@ -130,7 +152,8 @@ Commands:
   restart            down + setup (asks for confirmation)
   status             Show container and API status
   logs [api|front]   Follow API (PM2) or front (Docker) logs
-  update, pull       git pull in the install directory
+  project init       Copy GitHub Actions + deployer.yaml into an app repo
+  update, pull       git pull + refresh CLI symlink and scripts
   root, path         Print install directory
   help               Show this help
 

@@ -38,7 +38,7 @@ deployer help       # all commands
 
 | Topic | Where |
 |-------|--------|
-| GitHub Actions | Copy `actions/deploy-preview.yml` and `actions/teardown-preview.yml` into your repo |
+| GitHub Actions | `deployer project init` in your app repo, or copy from dashboard **Setup → GitHub Actions** |
 | Secrets & variables | Dashboard → **Setup → Secrets** (or see below) |
 | nginx on the host | `core/bin/setup-nginx.sh <domain>` + **Setup → Nginx** in the UI |
 | App config | `examples/deployer.yaml` in each project repo |
@@ -109,7 +109,9 @@ deployer restart        # down + setup
 deployer status         # Docker + PM2
 deployer logs api       # API logs
 deployer logs front     # front container logs
-deployer update         # git pull install dir
+deployer project init   # copy workflows + deployer.yaml into an app repo
+deployer project init ../my-app --branches main,develop
+deployer update         # git pull install dir + refresh CLI in PATH
 ```
 
 Installer env vars: `DEPLOYER_INSTALL_DIR`, `DEPLOYER_REPO_URL`.

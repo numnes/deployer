@@ -15,4 +15,12 @@ export class SetupController {
   checkNginx() {
     return this.setup.checkNginx();
   }
+
+  @ApiBearerAuth('jwt')
+  @ApiOkResponse({ description: 'Workflows e deployer.yaml para integração com repositórios' })
+  @UseGuards(JwtAuthGuard)
+  @Get('project-templates')
+  projectTemplates() {
+    return this.setup.getProjectTemplates();
+  }
 }
