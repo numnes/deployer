@@ -99,9 +99,6 @@ pushd "${ROOT_DIR}/api" >/dev/null
 "${PKG_MGR[@]}" run build
 popd >/dev/null
 
-echo "[dev-up] Setting up default admin user..."
-bash "${ROOT_DIR}/scripts/seed-default-user.sh"
-
 pushd "${ROOT_DIR}/api" >/dev/null
 set -a
 # shellcheck disable=SC1091
@@ -111,6 +108,18 @@ set +a
 "${PM2[@]}" delete deployer-api >/dev/null 2>&1 || true
 "${PM2[@]}" start "${ROOT_DIR}/api/dist/main.js" --name deployer-api --time --update-env --cwd "${ROOT_DIR}/api"
 popd >/dev/null
+
+echo "[dev-up] Waiting for API (schema sync)..."
+for _ in $(seq 1 30); do
+  code="$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${API_PORT}/docs" 2>/dev/null || echo 000)"
+  if [[ "$code" =~ ^(200|301|302|307|308)$ ]]; then
+    break
+  fi
+  sleep 1
+done
+
+echo "[dev-up] Setting up default admin user..."
+bash "${ROOT_DIR}/scripts/seed-default-user.sh"
 
 echo ""
 echo "[dev-up] OK"

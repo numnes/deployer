@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 /**
  * Create or update admin user in Postgres.
- * Usage: DEPLOYER_SEED_EMAIL=... DEPLOYER_SEED_PASSWORD=... node scripts/seed-default-user.js
+ *
+ * Usage:
+ *   node scripts/seed-default-user.js count
+ *   node scripts/seed-default-user.js list
+ *   DEPLOYER_SEED_EMAIL=... DEPLOYER_SEED_PASSWORD=... node scripts/seed-default-user.js
  */
 const fs = require('fs');
 const path = require('path');
@@ -27,7 +31,51 @@ function loadDatabaseUrl() {
   return 'postgresql://postgres:deployer@localhost:5432/deployer';
 }
 
-async function main() {
+function isMissingUsersTable(err) {
+  const msg = String(err?.message || err || '');
+  return (
+    err?.code === '42P01' ||
+    /relation "users" does not exist/i.test(msg)
+  );
+}
+
+async function withClient(fn) {
+  const client = new Client({ connectionString: loadDatabaseUrl() });
+  await client.connect();
+  try {
+    return await fn(client);
+  } finally {
+    await client.end();
+  }
+}
+
+async function countUsers() {
+  try {
+    return await withClient(async (client) => {
+      const res = await client.query('SELECT COUNT(*)::int AS count FROM users');
+      return res.rows[0]?.count ?? 0;
+    });
+  } catch (e) {
+    if (isMissingUsersTable(e)) return 0;
+    throw e;
+  }
+}
+
+async function listUserEmails() {
+  try {
+    return await withClient(async (client) => {
+      const res = await client.query(
+        'SELECT email FROM users ORDER BY created_at ASC LIMIT 10',
+      );
+      return res.rows.map((r) => r.email);
+    });
+  } catch (e) {
+    if (isMissingUsersTable(e)) return [];
+    throw e;
+  }
+}
+
+async function seedUser() {
   const email = (process.env.DEPLOYER_SEED_EMAIL || '').trim();
   const password = process.env.DEPLOYER_SEED_PASSWORD || '';
 
@@ -45,10 +93,8 @@ async function main() {
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const client = new Client({ connectionString: loadDatabaseUrl() });
-  await client.connect();
 
-  try {
+  await withClient(async (client) => {
     const existing = await client.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existing.rowCount > 0) {
       await client.query('UPDATE users SET password_hash = $1 WHERE email = $2', [
@@ -63,9 +109,27 @@ async function main() {
       );
       console.log(`[seed-user] User created: ${email}`);
     }
-  } finally {
-    await client.end();
+  });
+}
+
+async function main() {
+  const mode = process.argv[2];
+
+  if (mode === 'count') {
+    const count = await countUsers();
+    process.stdout.write(String(count));
+    return;
   }
+
+  if (mode === 'list') {
+    const emails = await listUserEmails();
+    for (const email of emails) {
+      process.stdout.write(`${email}\n`);
+    }
+    return;
+  }
+
+  await seedUser();
 }
 
 main().catch((e) => {

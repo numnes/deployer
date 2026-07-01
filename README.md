@@ -96,9 +96,11 @@ Main file: `api/.env` — **generated automatically** on `deployer setup` with P
 Skip or automate admin user creation:
 
 ```bash
-DEPLOYER_SKIP_SEED_USER=1 deployer setup
+DEPLOYER_SKIP_SEED_USER=1 deployer setup          # never prompt
 DEPLOYER_SEED_EMAIL=you@example.com DEPLOYER_SEED_PASSWORD=yourpassword deployer setup
 ```
+
+On restart, if users already exist you are asked whether to reset a password or add another user; press **N** to keep the current accounts.
 
 ## CLI reference
 

@@ -1,24 +1,33 @@
 #!/usr/bin/env bash
-# Prompts for email/password and writes admin user to Postgres (via scripts/seed-default-user.js).
+# Prompts for email/password when needed and writes admin user to Postgres.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ -n "${DEPLOYER_SKIP_SEED_USER:-}" ]]; then
-  echo "[dev-up] DEPLOYER_SKIP_SEED_USER set; skipping default user."
+  echo "[seed-user] DEPLOYER_SKIP_SEED_USER set; skipping default user."
   exit 0
 fi
+
+if ! docker ps --format '{{.Names}}' | grep -qx deployer-postgres; then
+  echo "[seed-user] Container deployer-postgres is not running." >&2
+  exit 1
+fi
+
+if [[ ! -d "${ROOT_DIR}/api/node_modules/bcrypt" ]]; then
+  echo "[seed-user] Run pnpm/npm install in api/ before seeding." >&2
+  exit 1
+fi
+
+run_seed() {
+  node "${ROOT_DIR}/scripts/seed-default-user.js"
+}
 
 prompt_credentials() {
   local email password password2
 
-  if [[ -n "${DEPLOYER_SEED_EMAIL:-}" && -n "${DEPLOYER_SEED_PASSWORD:-}" ]]; then
-    echo "[dev-up] Using DEPLOYER_SEED_EMAIL / DEPLOYER_SEED_PASSWORD from environment."
-    return 0
-  fi
-
   echo ""
-  echo "[dev-up] Default deployer user (dashboard login)"
+  echo "[seed-user] Dashboard login"
   read -r -p "Email: " email
   export DEPLOYER_SEED_EMAIL="$email"
 
@@ -40,16 +49,38 @@ prompt_credentials() {
   done
 }
 
+if [[ -n "${DEPLOYER_SEED_EMAIL:-}" && -n "${DEPLOYER_SEED_PASSWORD:-}" ]]; then
+  echo "[seed-user] Using DEPLOYER_SEED_EMAIL / DEPLOYER_SEED_PASSWORD from environment."
+  run_seed
+  exit 0
+fi
+
+user_count="$(node "${ROOT_DIR}/scripts/seed-default-user.js" count 2>/dev/null || echo 0)"
+if [[ ! "$user_count" =~ ^[0-9]+$ ]]; then
+  user_count=0
+fi
+
+if [[ "$user_count" -gt 0 ]]; then
+  echo ""
+  echo "[seed-user] Found ${user_count} user(s) already registered."
+  while IFS= read -r email; do
+    [[ -n "$email" ]] && echo "  - ${email}"
+  done < <(node "${ROOT_DIR}/scripts/seed-default-user.js" list 2>/dev/null || true)
+
+  if [[ "${DEPLOYER_YES:-}" == "1" ]]; then
+    echo "[seed-user] DEPLOYER_YES=1; skipping user setup."
+    exit 0
+  fi
+
+  echo ""
+  read -r -p "Reset a password or add another user? [y/N] " ans
+  if [[ ! "$ans" =~ ^[yY]$ ]]; then
+    echo "[seed-user] Keeping existing users; skipping setup."
+    exit 0
+  fi
+else
+  echo "[seed-user] No users in the database yet."
+fi
+
 prompt_credentials
-
-if ! docker ps --format '{{.Names}}' | grep -qx deployer-postgres; then
-  echo "[seed-user] Container deployer-postgres is not running." >&2
-  exit 1
-fi
-
-if [[ ! -d "${ROOT_DIR}/api/node_modules/bcrypt" ]]; then
-  echo "[seed-user] Run pnpm/npm install in api/ before seeding." >&2
-  exit 1
-fi
-
-node "${ROOT_DIR}/scripts/seed-default-user.js"
+run_seed
