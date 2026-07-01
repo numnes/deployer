@@ -196,6 +196,21 @@ apply_branches() {
   mv "$tmp" "$file"
 }
 
+apply_project_slug() {
+  local file="$1"
+  if [[ ! -f "$file" ]]; then
+    return
+  fi
+  if ! grep -q '__DEPLOYER_PROJECT_SLUG__' "$file"; then
+    return
+  fi
+  local tmp="${file}.tmp.$$"
+  sed "s/__DEPLOYER_PROJECT_SLUG__/${PROJECT_SLUG}/g" "$file" > "$tmp"
+  mv "$tmp" "$file"
+  log "set project slug in ${file#"$TARGET_DIR"/}"
+}
+
+
 mkdir -p "$WORKFLOWS_DIR"
 
 WROTE=0
@@ -217,6 +232,7 @@ done
 for wf in "${WORKFLOWS_DIR}/deploy-preview.yml" "${WORKFLOWS_DIR}/teardown-preview.yml"; do
   if [[ -f "$wf" ]]; then
     apply_branches "$wf"
+    apply_project_slug "$wf"
   fi
 done
 
@@ -227,8 +243,7 @@ echo ""
 echo "Next steps:"
 echo "  1. Register the project in the deployer dashboard (see registration JSON below)"
 echo "  2. Create an API key (Users → API Keys)"
-echo "  3. In the app repo GitHub settings, add secrets DEPLOYER_API_URL, DEPLOYER_API_KEY"
-echo "     and variable DEPLOYER_PROJECT_SLUG=${PROJECT_SLUG}"
+echo "  3. In the app repo GitHub settings, add secrets DEPLOYER_API_URL and DEPLOYER_API_KEY"
 echo "  4. Adjust deployer.yaml (build steps and PM2 target) for your stack"
 echo "  5. Commit and push .github/workflows/ and deployer.yaml"
 echo ""
@@ -245,5 +260,5 @@ echo ""
 echo "Import: Dashboard → Projects → Add project → Import registration JSON"
 echo ""
 echo "GitHub (repo → Settings → Secrets and variables → Actions):"
-echo "  Secrets:  DEPLOYER_API_URL, DEPLOYER_API_KEY"
-echo "  Variable: DEPLOYER_PROJECT_SLUG=${PROJECT_SLUG}"
+echo "  Secrets: DEPLOYER_API_URL, DEPLOYER_API_KEY"
+echo "  (project slug is already set in the workflow files)"

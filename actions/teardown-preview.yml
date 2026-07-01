@@ -1,5 +1,6 @@
-# Copie para o repositório da aplicação: .github/workflows/teardown-preview.yml
-# Secrets: DEPLOYER_API_URL, DEPLOYER_API_KEY (mesmos do deploy)
+# Copy to your app repo: .github/workflows/teardown-preview.yml
+# Repository secrets: DEPLOYER_API_URL, DEPLOYER_API_KEY (same as deploy)
+# PROJECT_SLUG is set by deployer project init
 name: Teardown preview (deployer)
 
 on:
@@ -13,18 +14,14 @@ jobs:
   teardown-preview:
     runs-on: ubuntu-latest
     steps:
-      - name: Remover instância de preview
+      - name: Remove preview instance
         env:
           DEPLOYER_API_URL: ${{ secrets.DEPLOYER_API_URL }}
           DEPLOYER_API_KEY: ${{ secrets.DEPLOYER_API_KEY }}
-          PROJECT_SLUG: ${{ vars.DEPLOYER_PROJECT_SLUG }}
+          PROJECT_SLUG: __DEPLOYER_PROJECT_SLUG__
         run: |
           if [ -z "$DEPLOYER_API_URL" ] || [ -z "$DEPLOYER_API_KEY" ]; then
-            echo "Defina os secrets DEPLOYER_API_URL e DEPLOYER_API_KEY no repositório."
-            exit 1
-          fi
-          if [ -z "$PROJECT_SLUG" ]; then
-            echo "Defina a variável DEPLOYER_PROJECT_SLUG no repositório."
+            echo "Set repository secrets DEPLOYER_API_URL and DEPLOYER_API_KEY."
             exit 1
           fi
           BRANCH="${{ github.head_ref }}"

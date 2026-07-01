@@ -182,7 +182,7 @@ export default function ProjectsPage() {
                     required
                   />
                   <p className="mt-1 text-xs text-[#8b919a]">
-                    Must match DEPLOYER_PROJECT_SLUG in GitHub.
+                    Must match the slug embedded in your GitHub Actions workflows.
                   </p>
                 </div>
                 <div>

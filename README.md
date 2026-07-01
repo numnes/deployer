@@ -50,7 +50,8 @@ deployer help       # all commands
 |------|-------------|
 | `DEPLOYER_API_URL` | Base URL of your deployer API |
 | `DEPLOYER_API_KEY` | API key from **Users → API Keys** |
-| `DEPLOYER_PROJECT_SLUG` (variable) | Project slug registered in deployer |
+
+The project slug is embedded in the workflow files when you run `deployer project init` (no GitHub variable needed).
 
 ## What you get
 

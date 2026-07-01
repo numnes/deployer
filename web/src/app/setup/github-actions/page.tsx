@@ -169,15 +169,16 @@ export default function SetupGithubActionsPage() {
               <p className="mt-3 text-[#8b919a]">
                 After importing, configure GitHub secrets{' '}
                 <code className="text-xs">DEPLOYER_API_URL</code> and{' '}
-                <code className="text-xs">DEPLOYER_API_KEY</code>, and variable{' '}
-                <code className="text-xs">DEPLOYER_PROJECT_SLUG</code> (same as slug). See{' '}
+                <code className="text-xs">DEPLOYER_API_KEY</code>. The project slug is written into
+                the workflow files by <code className="text-xs">deployer project init</code>. See{' '}
                 <strong className="text-[#b8bcc4]">Setup → Secrets</strong>.
               </p>
               <p className="mt-2 text-[#8b919a]">
                 Non-interactive overrides:{' '}
                 <code className="text-xs">DEPLOYER_PROJECT_SLUG</code>,{' '}
                 <code className="text-xs">DEPLOYER_PROJECT_GIT_URL</code>,{' '}
-                <code className="text-xs">DEPLOYER_PROJECT_SERVER_URL</code>.
+                <code className="text-xs">DEPLOYER_PROJECT_SERVER_URL</code> (CLI env vars for{' '}
+                <code className="text-xs">deployer project init</code> only).
               </p>
             </section>
 

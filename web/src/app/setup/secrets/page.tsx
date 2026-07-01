@@ -20,22 +20,13 @@ const SECRETS = [
   },
 ];
 
-const VARS = [
-  {
-    name: 'DEPLOYER_PROJECT_SLUG',
-    where: 'Repository variables (GitHub)',
-    description: 'Project slug registered in deployer (same as the Slug column under Projects).',
-    example: 'my-app',
-  },
-];
-
 export default function SetupSecretsPage() {
   return (
     <RequireAuth>
       <PageContainer>
         <PageHeader
-          title="Secrets & variables"
-          subtitle="Configure these in the application repo that runs preview workflows."
+          title="Secrets"
+          subtitle="Configure these in the application repo that runs preview workflows. The project slug is set in the workflow files by deployer project init."
         />
         <div className="card p-5">
           <div>
@@ -59,32 +50,6 @@ export default function SetupSecretsPage() {
                       <td className="px-3 py-2 text-[#b8bcc4]">{s.where}</td>
                       <td className="px-3 py-2 text-[#b8bcc4]">{s.description}</td>
                       <td className="px-3 py-2 font-mono text-xs text-[#8b919a]">{s.example}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="mt-8">
-            <h2 className="text-sm font-medium text-[#e8eaed]">Variables</h2>
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[640px] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-[#3d4048] text-left text-[#8b919a]">
-                    <th className="px-3 py-2 font-medium">Name</th>
-                    <th className="px-3 py-2 font-medium">Where</th>
-                    <th className="px-3 py-2 font-medium">Description</th>
-                    <th className="px-3 py-2 font-medium">Example</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {VARS.map((v) => (
-                    <tr key={v.name} className="border-b border-[#3d4048]">
-                      <td className="px-3 py-2 font-mono text-xs text-[#e8eaed]">{v.name}</td>
-                      <td className="px-3 py-2 text-[#b8bcc4]">{v.where}</td>
-                      <td className="px-3 py-2 text-[#b8bcc4]">{v.description}</td>
-                      <td className="px-3 py-2 font-mono text-xs text-[#8b919a]">{v.example}</td>
                     </tr>
                   ))}
                 </tbody>
