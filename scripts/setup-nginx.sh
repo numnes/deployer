@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
-# Wire deployer location includes into a system nginx sites-enabled config.
+# Print an nginx config with the deployer locations include line added.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 SITES_ENABLED="${NGINX_SITES_ENABLED:-/etc/nginx/sites-enabled}"
 FORCE_FILE=""
-YES=0
 
 usage() {
   cat <<EOF
 Usage: deployer setup nginx [options]
 
-List nginx sites-enabled configs, pick one, and add the deployer
-locations include line if it is not already present.
+List nginx sites-enabled configs, pick one, and print an updated
+version with the deployer locations include line (if not already present).
+
+Replace the file contents manually with the printed output.
 
 Options:
   -f, --file PATH       Use this nginx config (skip interactive list)
   -s, --sites-dir DIR   sites-enabled directory (default: ${SITES_ENABLED})
-  -y, --yes             Skip confirmation before editing the file
   -h, --help            Show this help
 
 Environment:
@@ -67,10 +67,9 @@ file_has_include() {
   return 1
 }
 
-insert_include() {
+render_with_include() {
   local file="$1"
   local line="$2"
-  local tmp="${file}.deployer.tmp.$$"
 
   if grep -qE '^[[:space:]]*server[[:space:]]*\{' "$file"; then
     awk -v insert="$line" '
@@ -85,20 +84,13 @@ insert_include() {
       END {
         if (!done) exit 1
       }
-    ' "$file" > "$tmp" || {
-      rm -f "$tmp"
-      die "Could not find a server { } block in ${file}"
-    }
+    ' "$file"
   else
-    {
-      echo ""
-      echo "# Added by deployer setup nginx"
-      echo "$line"
-    } >> "$file"
-    return 0
+    cat "$file"
+    echo ""
+    echo "# Added by deployer setup nginx"
+    echo "$line"
   fi
-
-  mv "$tmp" "$file"
 }
 
 pick_site_file() {
@@ -147,7 +139,6 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     -f|--file) FORCE_FILE="$2"; shift 2 ;;
     -s|--sites-dir) SITES_ENABLED="$2"; shift 2 ;;
-    -y|--yes) YES=1; shift ;;
     -h|--help) usage; exit 0 ;;
     -*) die "Unknown option: $1 (run with --help)" ;;
     *) die "Unexpected argument: $1" ;;
@@ -166,40 +157,30 @@ else
   TARGET_FILE="$(pick_site_file "$SITES_ENABLED")"
 fi
 
-[[ -f "$TARGET_FILE" ]] || die "File not found: ${TARGET_FILE}"
+[[ -r "$TARGET_FILE" ]] || die "Cannot read file: ${TARGET_FILE}"
 
 log "Selected config: ${TARGET_FILE}"
 
 if file_has_include "$TARGET_FILE" "$LOCATIONS_DIR"; then
-  log "Include line already present — no changes made."
+  log "Include line already present — no changes needed."
   exit 0
 fi
 
 echo ""
-echo "Will add this line inside the server block (or at the end of the file):"
+log "Add this line inside the server { } block:"
 echo "${LINE}"
 echo ""
-
-if [[ "$YES" != "1" ]]; then
-  read -r -p "Continue? [y/N] " ans
-  if [[ ! "$ans" =~ ^[yY]$ ]]; then
-    echo "Cancelled."
-    exit 0
-  fi
+log "Replace the contents of ${TARGET_FILE} with the block below."
+echo ""
+echo "=== Updated nginx config (copy everything between the markers) ==="
+if ! render_with_include "$TARGET_FILE" "$LINE"; then
+  die "Could not find a server { } block in ${TARGET_FILE}"
 fi
-
-insert_include "$TARGET_FILE" "$LINE"
-log "Updated ${TARGET_FILE}"
-
-if command -v nginx >/dev/null 2>&1; then
-  echo ""
-  log "Testing nginx configuration..."
-  if sudo nginx -t 2>/dev/null || nginx -t 2>/dev/null; then
-    log "nginx -t OK — run: sudo nginx -s reload"
-  else
-    echo "[setup-nginx] WARNING: nginx -t failed — review ${TARGET_FILE}" >&2
-    exit 1
-  fi
-else
-  log "nginx not found in PATH — reload manually after reviewing the file."
-fi
+echo "=== End updated nginx config ==="
+echo ""
+log "Next steps:"
+echo "  1. Open the file as root, e.g.:"
+echo "       sudo nano ${TARGET_FILE}"
+echo "  2. Replace the entire file contents with the block printed above."
+echo "  3. Test and reload nginx:"
+echo "       sudo nginx -t && sudo nginx -s reload"

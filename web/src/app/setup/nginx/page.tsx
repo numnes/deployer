@@ -36,8 +36,10 @@ export default function SetupNginxPage() {
               </pre>
               <p className="mt-2">
                 Lists files in <code className="text-xs">sites-enabled</code>, lets you pick one, and
-                adds <code className="text-xs">include .../*.location;</code> inside the{' '}
-                <code className="text-xs">server {'{}'}</code> block if it is not already there.
+                prints an updated config with{' '}
+                <code className="text-xs">include .../*.location;</code> inside the{' '}
+                <code className="text-xs">server {'{}'}</code> block. Copy the output and replace
+                the file contents manually (usually with <code className="text-xs">sudo nano</code>).
               </p>
               <p className="mt-2">
                 Or generate a full server snippet for a new domain:

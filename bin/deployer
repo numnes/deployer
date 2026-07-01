@@ -156,7 +156,7 @@ Usage: deployer <command> [options]
 
 Commands:
   setup, up, start   Start Postgres, Redis, web (Docker) and API (PM2)
-  setup nginx        Add deployer locations include to a sites-enabled config
+  setup nginx        Print nginx config with deployer locations include (manual edit)
   down, stop         Stop API and containers (asks for confirmation)
   restart            down + setup (asks for confirmation)
   status             Show container and API status
