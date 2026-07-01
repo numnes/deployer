@@ -46,9 +46,10 @@ export default function SetupNginxPage() {
             <section>
               <h2 className="font-medium text-[#e8eaed]">3. Project public URL</h2>
               <p className="mt-2">
-                Under <strong className="text-[#e8eaed]">Projects → settings</strong>, set the base
-                URL (e.g. <code className="text-xs">https://preview.example.com</code>). Branch
-                paths are at <code className="text-xs">{'{URL}'}/{'{branch-slug}'}/</code>.
+                Under <strong className="text-[#e8eaed]">Projects → settings</strong>, set the
+                public domain configured in nginx where preview instances are available (e.g.{' '}
+                <code className="text-xs">https://preview.example.com</code>). Branch paths are at{' '}
+                <code className="text-xs">{'{URL}/{branch-slug}/'}</code>.
               </p>
             </section>
 

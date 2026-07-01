@@ -113,11 +113,79 @@ export default function SetupGithubActionsPage() {
             </section>
 
             <section>
-              <h2 className="font-medium text-[#e8eaed]">4. Register the project in the API</h2>
+              <h2 className="font-medium text-[#e8eaed]">4. Register the project in deployer</h2>
               <p className="mt-2">
-                The slug under <strong className="text-[#e8eaed]">Projects</strong> must match{' '}
-                <code className="text-xs">DEPLOYER_PROJECT_SLUG</code> in GitHub. See{' '}
-                <strong className="text-[#e8eaed]">Setup → Secrets</strong> for secrets and variables.
+                <code className="text-xs">deployer project init</code> detects metadata from your
+                repo (Git remote, <code className="text-xs">package.json</code> name, or folder
+                name), asks for anything missing, copies workflow files, then prints a{' '}
+                <strong className="text-[#e8eaed]">registration JSON</strong> between{' '}
+                <code className="text-xs">=== Registration JSON ===</code> markers.
+              </p>
+              <p className="mt-2">Auto-detected when possible:</p>
+              <ul className="mt-2 list-inside list-disc space-y-1">
+                <li>
+                  <strong className="text-[#e8eaed]">gitUrl</strong> —{' '}
+                  <code className="text-xs">git remote get-url origin</code> (SSH URLs are
+                  converted to HTTPS)
+                </li>
+                <li>
+                  <strong className="text-[#e8eaed]">slug</strong> — npm{' '}
+                  <code className="text-xs">package.json</code> name or repository folder name
+                </li>
+                <li>
+                  <strong className="text-[#e8eaed]">serverUrl</strong> — optional; the public
+                  domain configured in nginx where preview instances are available (e.g.{' '}
+                  <code className="text-xs">https://preview.example.com</code>). Each branch is
+                  served at <code className="text-xs">{'{URL}/{branch-slug}/'}</code>
+                </li>
+              </ul>
+              <p className="mt-3">Import the JSON in the dashboard:</p>
+              <ol className="mt-2 list-inside list-decimal space-y-1">
+                <li>
+                  Copy the JSON block from the terminal (from{' '}
+                  <code className="text-xs">deployer project init</code>)
+                </li>
+                <li>
+                  Open <strong className="text-[#e8eaed]">Projects → Add project</strong>
+                </li>
+                <li>
+                  Paste into <strong className="text-[#e8eaed]">Import registration JSON</strong>
+                </li>
+                <li>
+                  Click <strong className="text-[#e8eaed]">Create from JSON</strong> (or{' '}
+                  <strong className="text-[#e8eaed]">Apply to form</strong> to review first)
+                </li>
+              </ol>
+              <div className="mt-4">
+                <CodeBlock
+                  title="Example registration JSON (printed by deployer project init)"
+                  content={`{
+  "version": 1,
+  "kind": "deployer-project-registration",
+  "project": {
+    "slug": "my-app",
+    "gitUrl": "https://github.com/org/my-app.git",
+    "serverUrl": "https://preview.example.com"
+  },
+  "github": {
+    "variables": {
+      "DEPLOYER_PROJECT_SLUG": "my-app"
+    },
+    "secrets": ["DEPLOYER_API_URL", "DEPLOYER_API_KEY"]
+  }
+}`}
+                />
+              </div>
+              <p className="mt-3 text-[#8b919a]">
+                Set GitHub variable <code className="text-xs">DEPLOYER_PROJECT_SLUG</code> to the
+                same slug. See <strong className="text-[#b8bcc4]">Setup → Secrets</strong> for
+                secrets and variables.
+              </p>
+              <p className="mt-2 text-[#8b919a]">
+                Non-interactive overrides:{' '}
+                <code className="text-xs">DEPLOYER_PROJECT_SLUG</code>,{' '}
+                <code className="text-xs">DEPLOYER_PROJECT_GIT_URL</code>,{' '}
+                <code className="text-xs">DEPLOYER_PROJECT_SERVER_URL</code>.
               </p>
             </section>
 

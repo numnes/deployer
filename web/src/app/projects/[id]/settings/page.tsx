@@ -95,7 +95,7 @@ export default function ProjectSettingsPage() {
             >
               <div>
                 <label className="mb-1.5 block text-sm text-white/70">
-                  Public server URL (nginx base)
+                  Public URL (nginx domain)
                 </label>
                 <input
                   className="input"
@@ -105,15 +105,16 @@ export default function ProjectSettingsPage() {
                   type="url"
                 />
                 <p className="mt-2 text-xs text-white/55">
+                  The public domain configured in nginx where preview instances are available.
                   Branch preview lives at{' '}
                   <span className="font-mono text-white/75">
                     {'{URL}'}/{'{branch-slug}'}/{' '}
                   </span>
-                  , aligned with PM2{' '}
+                  (PM2 app{' '}
                   <span className="font-mono text-white/75">
                     {project.slug}-…
                   </span>
-                  .
+                  ).
                 </p>
               </div>
               <div className="flex gap-3">

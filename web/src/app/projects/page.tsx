@@ -4,6 +4,7 @@ import { PageContainer } from "@/components/PageContainer";
 import { PageHeader } from "@/components/PageHeader";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ClientTable } from "@/components/ClientTable";
+import { parseProjectRegistrationJson } from "@/lib/project-registration-json";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createProject, listProjects, type Project } from "./::handlers/projects";
@@ -16,6 +17,8 @@ export default function ProjectsPage() {
   const [slug, setSlug] = useState("");
   const [gitUrl, setGitUrl] = useState("");
   const [serverUrl, setServerUrl] = useState("");
+  const [importJson, setImportJson] = useState("");
+  const [importError, setImportError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -36,12 +39,55 @@ export default function ProjectsPage() {
     };
   }, []);
 
+  async function submitProject(fields: {
+    slug: string;
+    gitUrl: string;
+    serverUrl: string | null;
+  }) {
+    setFormError(null);
+    setCreating(true);
+    try {
+      const created = await createProject({
+        slug: fields.slug,
+        gitUrl: fields.gitUrl,
+        serverUrl: fields.serverUrl,
+      });
+      setProjects((prev) =>
+        [...(prev ?? []), created].sort((a, b) => a.slug.localeCompare(b.slug)),
+      );
+      setSlug("");
+      setGitUrl("");
+      setServerUrl("");
+      setImportJson("");
+      setImportError(null);
+      setShowForm(false);
+    } catch {
+      setFormError(
+        "Could not create project. Check slug (lowercase, hyphens) and git URL.",
+      );
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  function applyImportJson() {
+    setImportError(null);
+    try {
+      const fields = parseProjectRegistrationJson(importJson);
+      setSlug(fields.slug);
+      setGitUrl(fields.gitUrl);
+      setServerUrl(fields.serverUrl ?? "");
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : "Invalid registration JSON.");
+    }
+  }
+
   return (
     <RequireAuth>
       <PageContainer>
         <PageHeader
           title="Projects"
-          subtitle="Slugs are used by the GitHub Action when calling deploy."
+          subtitle="Slugs are used by the GitHub Action when calling deploy. Run deployer project init in your app repo to get a registration JSON."
           action={
             <button
               type="button"
@@ -49,6 +95,7 @@ export default function ProjectsPage() {
               onClick={() => {
                 setShowForm((v) => !v);
                 setFormError(null);
+                setImportError(null);
               }}
             >
               {showForm ? "Cancel" : "Add project"}
@@ -57,40 +104,72 @@ export default function ProjectsPage() {
         />
 
         {showForm ? (
-          <div className="card mb-5 p-5">
+          <div className="card mb-5 space-y-6 p-5">
+            <div>
+              <h2 className="text-sm font-medium text-[#e8eaed]">
+                Import registration JSON
+              </h2>
+              <p className="mt-1 text-xs text-[#8b919a]">
+                Paste the JSON printed at the end of{" "}
+                <code className="text-[#b8bcc4]">deployer project init</code> (between the
+                === markers), then apply it to the form or create the project directly.
+              </p>
+              <textarea
+                className="input mt-3 min-h-[140px] font-mono text-xs"
+                value={importJson}
+                onChange={(e) => {
+                  setImportJson(e.target.value);
+                  setImportError(null);
+                }}
+                placeholder='{"version":1,"kind":"deployer-project-registration","project":{"slug":"my-app","gitUrl":"https://github.com/org/repo.git"}}'
+              />
+              {importError ? <div className="alert-error mt-2">{importError}</div> : null}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={!importJson.trim()}
+                  onClick={applyImportJson}
+                >
+                  Apply to form
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  disabled={creating || !importJson.trim()}
+                  onClick={async () => {
+                    setImportError(null);
+                    try {
+                      const fields = parseProjectRegistrationJson(importJson);
+                      await submitProject({
+                        slug: fields.slug,
+                        gitUrl: fields.gitUrl,
+                        serverUrl: fields.serverUrl ?? null,
+                      });
+                    } catch (e) {
+                      setImportError(
+                        e instanceof Error ? e.message : "Invalid registration JSON.",
+                      );
+                    }
+                  }}
+                >
+                  {creating ? "Creating…" : "Create from JSON"}
+                </button>
+              </div>
+            </div>
+
             <form
-              className="space-y-4"
+              className="space-y-4 border-t border-[#3d4048] pt-5"
               onSubmit={async (e) => {
                 e.preventDefault();
-                setFormError(null);
-                setCreating(true);
-                try {
-                  const trimmedSlug = slug.trim();
-                  const trimmedGit = gitUrl.trim();
-                  const trimmedServer = serverUrl.trim();
-                  const created = await createProject({
-                    slug: trimmedSlug,
-                    gitUrl: trimmedGit,
-                    serverUrl: trimmedServer === "" ? null : trimmedServer,
-                  });
-                  setProjects((prev) =>
-                    [...(prev ?? []), created].sort((a, b) =>
-                      a.slug.localeCompare(b.slug),
-                    ),
-                  );
-                  setSlug("");
-                  setGitUrl("");
-                  setServerUrl("");
-                  setShowForm(false);
-                } catch {
-                  setFormError(
-                    "Could not create project. Check slug (lowercase, hyphens) and git URL.",
-                  );
-                } finally {
-                  setCreating(false);
-                }
+                await submitProject({
+                  slug: slug.trim(),
+                  gitUrl: gitUrl.trim(),
+                  serverUrl: serverUrl.trim() === "" ? null : serverUrl.trim(),
+                });
               }}
             >
+              <h2 className="text-sm font-medium text-[#e8eaed]">Manual entry</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1.5 block text-sm text-[#b8bcc4]">Slug</label>
@@ -128,6 +207,11 @@ export default function ProjectsPage() {
                     placeholder="https://preview.example.com"
                     type="url"
                   />
+                  <p className="mt-1 text-xs text-[#8b919a]">
+                    The public domain configured in nginx where preview instances are available.
+                    Branch previews are served at{' '}
+                    <span className="font-mono text-[#b8bcc4]">{'{URL}/{branch-slug}/'}</span>.
+                  </p>
                 </div>
               </div>
               {formError ? <div className="alert-error">{formError}</div> : null}
@@ -193,7 +277,8 @@ export default function ProjectsPage() {
             {projects && projects.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-3 py-3 text-white/70">
-                  No projects yet. Click Add project to register one.
+                  No projects yet. Click Add project or run deployer project init in your app
+                  repo.
                 </td>
               </tr>
             ) : null}

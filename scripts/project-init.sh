@@ -32,6 +32,77 @@ EOF
 log() { echo "[project-init] $*"; }
 die() { echo "[project-init] ERROR: $*" >&2; exit 1; }
 
+slug_valid() {
+  [[ "$1" =~ ^[a-z0-9][a-z0-9-]*$ ]]
+}
+
+prompt_with_default() {
+  local label="$1"
+  local default="$2"
+  local value=""
+  if [[ -n "$default" ]]; then
+    read -r -p "${label} [${default}]: " value
+    value="${value:-$default}"
+  else
+    while [[ -z "$value" ]]; do
+      read -r -p "${label}: " value
+      [[ -n "$value" ]] || echo "Required." >&2
+    done
+  fi
+  printf '%s' "$value"
+}
+
+collect_project_metadata() {
+  local detected_json
+  detected_json="$(node "${ROOT_DIR}/scripts/project-metadata.js" detect "$TARGET_DIR")"
+
+  local default_slug default_git
+  default_slug="$(DETECTED="$detected_json" node -e 'const d=JSON.parse(process.env.DETECTED);process.stdout.write(d.slug||"")')"
+  default_git="$(DETECTED="$detected_json" node -e 'const d=JSON.parse(process.env.DETECTED);process.stdout.write(d.gitUrl||"")')"
+  local slug_source git_source
+  slug_source="$(DETECTED="$detected_json" node -e 'const d=JSON.parse(process.env.DETECTED);process.stdout.write(d.sources?.slug||"")')"
+  git_source="$(DETECTED="$detected_json" node -e 'const d=JSON.parse(process.env.DETECTED);process.stdout.write(d.sources?.gitUrl||"")')"
+
+  echo ""
+  log "Project registration (for deployer dashboard)"
+  [[ -n "$slug_source" ]] && echo "  slug hint: ${slug_source}"
+  [[ -n "$git_source" ]] && echo "  git URL hint: ${git_source}"
+
+  if [[ -n "${DEPLOYER_PROJECT_SLUG:-}" ]]; then
+    PROJECT_SLUG="$DEPLOYER_PROJECT_SLUG"
+    echo "  slug: ${PROJECT_SLUG} (DEPLOYER_PROJECT_SLUG)"
+  else
+    while true; do
+      PROJECT_SLUG="$(prompt_with_default "Slug" "$default_slug")"
+      if slug_valid "$PROJECT_SLUG"; then
+        break
+      fi
+      echo "Invalid slug. Use lowercase letters, numbers, and hyphens." >&2
+    done
+  fi
+
+  if [[ -n "${DEPLOYER_PROJECT_GIT_URL:-}" ]]; then
+    PROJECT_GIT_URL="$DEPLOYER_PROJECT_GIT_URL"
+    echo "  git URL: ${PROJECT_GIT_URL} (DEPLOYER_PROJECT_GIT_URL)"
+  else
+    while true; do
+      PROJECT_GIT_URL="$(prompt_with_default "Git URL" "$default_git")"
+      [[ -n "$PROJECT_GIT_URL" ]] && break
+      echo "Git URL is required." >&2
+    done
+  fi
+
+  if [[ -n "${DEPLOYER_PROJECT_SERVER_URL:-}" ]]; then
+    PROJECT_SERVER_URL="$DEPLOYER_PROJECT_SERVER_URL"
+  else
+    echo ""
+    echo "  Public URL: the public domain configured in nginx where preview instances"
+    echo "  will be available (e.g. https://preview.example.com)."
+    echo "  Each branch is served at {URL}/{branch-slug}/"
+    read -r -p "Public URL (optional): " PROJECT_SERVER_URL
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -f|--force) FORCE=1; shift ;;
@@ -71,6 +142,8 @@ if [[ -f "${TARGET_DIR}/.git" ]] || [[ -d "${TARGET_DIR}/.git" ]]; then
 else
   log "Warning: ${TARGET_DIR} does not look like a git repository (no .git)."
 fi
+
+collect_project_metadata
 
 write_file() {
   local dest="$1"
@@ -152,13 +225,21 @@ log "Done in ${TARGET_DIR}"
 log "  files written: ${WROTE}, skipped: ${SKIPPED}"
 echo ""
 echo "Next steps:"
-echo "  1. Register the project in the deployer dashboard (Projects → slug must match DEPLOYER_PROJECT_SLUG)"
+echo "  1. Register the project in the deployer dashboard (see registration JSON below)"
 echo "  2. Create an API key (Users → API Keys)"
-echo "  3. In the app repo GitHub settings, add secrets:"
-echo "       DEPLOYER_API_URL, DEPLOYER_API_KEY"
-echo "     and variable:"
-echo "       DEPLOYER_PROJECT_SLUG"
+echo "  3. In the app repo GitHub settings, add secrets DEPLOYER_API_URL, DEPLOYER_API_KEY"
+echo "     and variable DEPLOYER_PROJECT_SLUG=${PROJECT_SLUG}"
 echo "  4. Adjust deployer.yaml (build steps and PM2 target) for your stack"
 echo "  5. Commit and push .github/workflows/ and deployer.yaml"
 echo ""
-echo "Docs: dashboard → Setup → GitHub Actions / Secrets"
+echo "Docs: dashboard → Setup → GitHub Actions"
+echo ""
+echo "=== Registration JSON (import in Projects → Add project) ==="
+registration_args=(--slug "$PROJECT_SLUG" --git-url "$PROJECT_GIT_URL")
+if [[ -n "${PROJECT_SERVER_URL:-}" ]]; then
+  registration_args+=(--server-url "$PROJECT_SERVER_URL")
+fi
+node "${ROOT_DIR}/scripts/project-metadata.js" registration-json "${registration_args[@]}"
+echo "=== End registration JSON ==="
+echo ""
+echo "Import: copy the JSON above → Dashboard → Projects → Add project → Import registration JSON"
