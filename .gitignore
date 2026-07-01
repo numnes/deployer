@@ -1,7 +1,7 @@
-server/node_modules/
-server/dist/
-front/node_modules/
-front/.next/
+api/node_modules/
+api/dist/
+web/node_modules/
+web/.next/
 tui/node_modules/
 **/node_modules/
 *.log

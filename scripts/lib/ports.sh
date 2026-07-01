@@ -12,7 +12,7 @@ docker_host_port() {
   docker port "$container" "${internal_port}/tcp" 2>/dev/null | head -1 | sed 's/.*://'
 }
 
-# Ports already assigned in this run (avoid API/front/redis/postgres colliding).
+# Ports already assigned in this run (avoid API/web/redis/postgres colliding).
 DEPLOYER_PICKED_PORTS=()
 
 deployer_port_is_picked() {

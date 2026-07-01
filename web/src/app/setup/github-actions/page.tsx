@@ -1,0 +1,146 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { CodeBlock } from '@/components/CodeBlock';
+import { PageContainer } from '@/components/PageContainer';
+import { PageHeader } from '@/components/PageHeader';
+import { RequireAuth } from '@/components/RequireAuth';
+import {
+  fetchProjectTemplates,
+  type ProjectTemplatesResult,
+} from '../::handlers/setup';
+
+export default function SetupGithubActionsPage() {
+  const [templates, setTemplates] = useState<ProjectTemplatesResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchProjectTemplates()
+      .then((data) => {
+        if (!cancelled) setTemplates(data);
+      })
+      .catch((e: unknown) => {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to load templates');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const workflowFiles =
+    templates?.files.filter((f) => f.path.startsWith('.github/workflows/')) ?? [];
+  const deployerYaml = templates?.files.find((f) => f.path === 'deployer.yaml');
+
+  return (
+    <RequireAuth>
+      <PageContainer>
+        <PageHeader
+          title="GitHub Actions"
+          subtitle="Workflows for deploy on PR open/update and teardown on close."
+        />
+        <div className="card p-5">
+          <div className="space-y-8 text-sm text-[#b8bcc4]">
+            <section>
+              <h2 className="font-medium text-[#e8eaed]">1. Automatic setup (recommended)</h2>
+              <p className="mt-2">
+                From your application repo root, run the command below. It creates{' '}
+                <code className="rounded bg-[#2b2e33] px-1.5 py-0.5 text-xs">.github/workflows/</code>{' '}
+                with both workflows and copies{' '}
+                <code className="rounded bg-[#2b2e33] px-1.5 py-0.5 text-xs">deployer.yaml</code>{' '}
+                to the project root.
+              </p>
+              <div className="mt-3">
+                <CodeBlock
+                  title="Terminal — in your app folder"
+                  content={`# current directory\n${templates?.cliCommand ?? 'deployer project init'}\n\n# explicit path\n${templates?.cliCommand ?? 'deployer project init'} ../my-app\n\n# PR target branches (default: master,homologation)\n${templates?.cliCommand ?? 'deployer project init'} --branches main,develop\n\n# overwrite existing files\n${templates?.cliCommand ?? 'deployer project init'} --force`}
+                />
+              </div>
+              <p className="mt-3 text-[#8b919a]">
+                Files created:{' '}
+                <code className="text-xs">.github/workflows/deploy-preview.yml</code>,{' '}
+                <code className="text-xs">.github/workflows/teardown-preview.yml</code>,{' '}
+                <code className="text-xs">deployer.yaml</code>. Then adjust{' '}
+                <code className="text-xs">deployer.yaml</code> (build and PM2 target) and commit.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="font-medium text-[#e8eaed]">2. Workflow contents</h2>
+              <p className="mt-2">
+                To copy manually, use the files below in your app repo{' '}
+                <code className="rounded bg-[#2b2e33] px-1.5 py-0.5 text-xs">.github/workflows/</code>.
+              </p>
+              {loading ? (
+                <p className="mt-4 text-[#8b919a]">Loading templates…</p>
+              ) : error ? (
+                <p className="mt-4 text-red-400">{error}</p>
+              ) : (
+                <div className="mt-4 space-y-4">
+                  {workflowFiles.map((file) => (
+                    <CodeBlock
+                      key={file.path}
+                      title={file.path.split('/').pop() ?? file.path}
+                      path={file.path}
+                      content={file.content}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section>
+              <h2 className="font-medium text-[#e8eaed]">3. deployer.yaml</h2>
+              <p className="mt-2">
+                At the application repo root (same level as the clone). Defines build commands and
+                the PM2 entrypoint.
+              </p>
+              {deployerYaml ? (
+                <div className="mt-4">
+                  <CodeBlock
+                    title="deployer.yaml"
+                    path={deployerYaml.path}
+                    content={deployerYaml.content}
+                  />
+                </div>
+              ) : null}
+            </section>
+
+            <section>
+              <h2 className="font-medium text-[#e8eaed]">4. Register the project in the API</h2>
+              <p className="mt-2">
+                The slug under <strong className="text-[#e8eaed]">Projects</strong> must match{' '}
+                <code className="text-xs">DEPLOYER_PROJECT_SLUG</code> in GitHub. See{' '}
+                <strong className="text-[#e8eaed]">Setup → Secrets</strong> for secrets and variables.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="font-medium text-[#e8eaed]">5. Deploy flow</h2>
+              <ol className="mt-2 list-inside list-decimal space-y-1">
+                <li>PR opened/updated triggers the workflow</li>
+                <li>
+                  <code className="text-xs">POST /deploy</code> with project + branch
+                </li>
+                <li>API queues the job; core clones, builds, and starts PM2</li>
+                <li>
+                  Preview at {'{project URL}'}/{'{branch-slug}'}/
+                </li>
+                <li>
+                  On PR close, <code className="text-xs">POST /deploy/destroy</code> removes the
+                  instance
+                </li>
+              </ol>
+            </section>
+          </div>
+        </div>
+      </PageContainer>
+    </RequireAuth>
+  );
+}

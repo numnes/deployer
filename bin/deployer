@@ -39,7 +39,7 @@ confirm_down() {
   echo ""
   echo "⚠  This will shut down deployer:"
   echo "   • API (PM2: deployer-api)"
-  echo "   • Docker containers (Postgres, Redis, Front)"
+  echo "   • Docker containers (Postgres, Redis, Web)"
   echo ""
   read -r -p "Continue? [y/N] " ans
   if [[ ! "$ans" =~ ^[yY]$ ]]; then
@@ -63,16 +63,16 @@ case "$cmd" in
     ;;
   status)
     echo "=== Deployer ($ROOT) ==="
-    ENV_FILE="${ROOT}/server/.env"
+    ENV_FILE="${ROOT}/api/.env"
     if [[ -f "$ENV_FILE" ]]; then
       api_port="$(grep -E '^PORT=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
-      front_port="$(grep -E '^CORS_ORIGIN=' "$ENV_FILE" 2>/dev/null | tail -1 | sed 's/.*://' | tr -d '[:space:]')"
+      web_port="$(grep -E '^CORS_ORIGIN=' "$ENV_FILE" 2>/dev/null | tail -1 | sed 's/.*://' | tr -d '[:space:]')"
       pg_port="$(grep -E '^DATABASE_URL=' "$ENV_FILE" 2>/dev/null | tail -1 | sed -n 's/.*:\([0-9]*\)\/deployer.*/\1/p')"
       redis_port="$(grep -E '^REDIS_PORT=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
       echo ""
-      echo "Ports (from server/.env):"
+      echo "Ports (from api/.env):"
       echo "  API:      ${api_port:-?}"
-      echo "  Front:    ${front_port:-?}"
+      echo "  Web:      ${web_port:-?}"
       echo "  Postgres: ${pg_port:-?}"
       echo "  Redis:    ${redis_port:-?}"
     fi
@@ -101,11 +101,11 @@ case "$cmd" in
           exec npx --yes pm2 logs deployer-api --lines 100
         fi
         ;;
-      front)
-        exec docker logs -f --tail 100 deployer-front
+      web|front)
+        exec docker logs -f --tail 100 deployer-web
         ;;
       *)
-        echo "Usage: deployer logs [api|front]" >&2
+        echo "Usage: deployer logs [api|web]" >&2
         exit 1
         ;;
     esac
@@ -147,11 +147,11 @@ deployer — local Deployer stack management
 Usage: deployer <command> [options]
 
 Commands:
-  setup, up, start   Start Postgres, Redis, front (Docker) and API (PM2)
+  setup, up, start   Start Postgres, Redis, web (Docker) and API (PM2)
   down, stop         Stop API and containers (asks for confirmation)
   restart            down + setup (asks for confirmation)
   status             Show container and API status
-  logs [api|front]   Follow API (PM2) or front (Docker) logs
+  logs [api|web]     Follow API (PM2) or web (Docker) logs
   project init       Copy GitHub Actions + deployer.yaml into an app repo
   update, pull       git pull + refresh CLI symlink and scripts
   root, path         Print install directory

@@ -40,30 +40,30 @@ stop_api_for_port_scan
 POSTGRES_PUBLISH_PORT="$(pick_port 5432 deployer-postgres 5432 5433 5434 5435 5436 5440 5450)"
 REDIS_PUBLISH_PORT="$(pick_port 6480 deployer-redis 6379 6380 6381 6382 6481 6482 6483)"
 API_PORT="$(pick_port 3000 "" "" 3002 3003 3004 3005 3010 3020 3030)"
-FRONT_PUBLISH_PORT="$(pick_port 3001 deployer-front 3000 3002 3003 3004 3005 3011 3021 3031)"
+WEB_PUBLISH_PORT="$(pick_port 3001 deployer-web 3000 3002 3003 3004 3005 3011 3021 3031)"
 
 for pair in \
   "Postgres:${POSTGRES_PUBLISH_PORT}:5432" \
   "Redis:${REDIS_PUBLISH_PORT}:6480" \
   "API:${API_PORT}:3000" \
-  "Front:${FRONT_PUBLISH_PORT}:3001"; do
+  "Web:${WEB_PUBLISH_PORT}:3001"; do
   IFS=: read -r label port default <<< "$pair"
   if [[ "$port" != "$default" ]]; then
     echo "[dev-up] Port ${default} in use; ${label} on ${port}"
   fi
 done
 
-bash "${ROOT_DIR}/scripts/ensure-server-env.sh" \
+bash "${ROOT_DIR}/scripts/ensure-api-env.sh" \
   --api-port "$API_PORT" \
   --postgres-port "$POSTGRES_PUBLISH_PORT" \
   --redis-port "$REDIS_PUBLISH_PORT" \
-  --front-port "$FRONT_PUBLISH_PORT"
+  --web-port "$WEB_PUBLISH_PORT"
 
-export POSTGRES_PUBLISH_PORT REDIS_PUBLISH_PORT FRONT_PUBLISH_PORT
+export POSTGRES_PUBLISH_PORT REDIS_PUBLISH_PORT WEB_PUBLISH_PORT
 export NEXT_PUBLIC_API_URL="http://localhost:${API_PORT}"
 
-echo "[dev-up] Starting Postgres/Redis/Front in Docker..."
-compose up -d --build postgres redis front
+echo "[dev-up] Starting Postgres/Redis/Web in Docker..."
+compose up -d --build postgres redis web
 
 echo "[dev-up] Waiting for Postgres to become healthy..."
 postgres_ok=false
@@ -94,7 +94,7 @@ else
   PM2=(npx --yes pm2)
 fi
 
-pushd "${ROOT_DIR}/server" >/dev/null
+pushd "${ROOT_DIR}/api" >/dev/null
 "${PKG_MGR[@]}" install
 "${PKG_MGR[@]}" run build
 popd >/dev/null
@@ -102,24 +102,24 @@ popd >/dev/null
 echo "[dev-up] Setting up default admin user..."
 bash "${ROOT_DIR}/scripts/seed-default-user.sh"
 
-pushd "${ROOT_DIR}/server" >/dev/null
+pushd "${ROOT_DIR}/api" >/dev/null
 set -a
 # shellcheck disable=SC1091
 source ".env"
 set +a
 
 "${PM2[@]}" delete deployer-api >/dev/null 2>&1 || true
-"${PM2[@]}" start "${ROOT_DIR}/server/dist/main.js" --name deployer-api --time --update-env --cwd "${ROOT_DIR}/server"
+"${PM2[@]}" start "${ROOT_DIR}/api/dist/main.js" --name deployer-api --time --update-env --cwd "${ROOT_DIR}/api"
 popd >/dev/null
 
 echo ""
 echo "[dev-up] OK"
 echo "  - API:   http://localhost:${API_PORT} (PM2: deployer-api)"
-echo "  - Front: http://localhost:${FRONT_PUBLISH_PORT} (Docker: deployer-front)"
+echo "  - Web:   http://localhost:${WEB_PUBLISH_PORT} (Docker: deployer-web)"
 echo "  - Postgres: localhost:${POSTGRES_PUBLISH_PORT}"
 echo "  - Redis: localhost:${REDIS_PUBLISH_PORT}"
 echo ""
 
 api_code="$(wait_for_http "http://localhost:${API_PORT}/docs" "API" || true)"
-front_code="$(wait_for_http "http://localhost:${FRONT_PUBLISH_PORT}/" "Front" || true)"
-echo "[dev-up] Health check: API /docs=${api_code}, Front=${front_code}"
+web_code="$(wait_for_http "http://localhost:${WEB_PUBLISH_PORT}/" "Web" || true)"
+echo "[dev-up] Health check: API /docs=${api_code}, Web=${web_code}"

@@ -47,8 +47,8 @@ if ! docker ps --format '{{.Names}}' | grep -qx deployer-postgres; then
   exit 1
 fi
 
-if [[ ! -d "${ROOT_DIR}/server/node_modules/bcrypt" ]]; then
-  echo "[seed-user] Run pnpm/npm install in server/ before seeding." >&2
+if [[ ! -d "${ROOT_DIR}/api/node_modules/bcrypt" ]]; then
+  echo "[seed-user] Run pnpm/npm install in api/ before seeding." >&2
   exit 1
 fi
 

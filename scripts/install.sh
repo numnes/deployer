@@ -40,10 +40,10 @@ fi
 
 DEPLOYER_BIN_DIR="$BIN_DIR" bash "${INSTALL_DIR}/scripts/sync-cli.sh"
 
-if [[ ! -f "${INSTALL_DIR}/server/.env" ]]; then
-  if [[ -f "${INSTALL_DIR}/server/.env.example" ]]; then
-    cp "${INSTALL_DIR}/server/.env.example" "${INSTALL_DIR}/server/.env"
-    log "Created server/.env from .env.example (deployer setup will finalize it)"
+if [[ ! -f "${INSTALL_DIR}/api/.env" ]]; then
+  if [[ -f "${INSTALL_DIR}/api/.env.example" ]]; then
+    cp "${INSTALL_DIR}/api/.env.example" "${INSTALL_DIR}/api/.env"
+    log "Created api/.env from .env.example (deployer setup will finalize it)"
   fi
 fi
 

@@ -5,11 +5,11 @@
  */
 const fs = require('fs');
 const path = require('path');
-const bcrypt = require(path.join(__dirname, '../server/node_modules/bcrypt'));
-const { Client } = require(path.join(__dirname, '../server/node_modules/pg'));
+const bcrypt = require(path.join(__dirname, '../api/node_modules/bcrypt'));
+const { Client } = require(path.join(__dirname, '../api/node_modules/pg'));
 
 const ROOT = path.join(__dirname, '..');
-const ENV_PATH = path.join(ROOT, 'server', '.env');
+const ENV_PATH = path.join(ROOT, 'api', '.env');
 
 function loadDatabaseUrl() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;

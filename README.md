@@ -19,7 +19,7 @@ curl -fsSL https://raw.githubusercontent.com/numnes/deployer/main/scripts/instal
 Make sure `~/.local/bin` is on your `PATH`, then:
 
 ```bash
-deployer setup    # Postgres + Redis + front (Docker) + API (PM2)
+deployer setup    # Postgres + Redis + web (Docker) + API (PM2)
 deployer status   # check services
 ```
 
@@ -72,21 +72,21 @@ deployer help       # all commands
 ## Architecture (short)
 
 - **`core/`** — Bash scripts: clone, build, PM2, nginx locations, pause, destroy  
-- **`server/`** — NestJS API, Postgres, BullMQ/Redis job queue  
-- **`front/`** — Next.js dashboard (instances, projects, setup guides)  
+- **`api/`** — NestJS API, Postgres, BullMQ/Redis job queue  
+- **`web/`** — Next.js dashboard (instances, projects, setup guides)  
 
 Deploy is triggered with `POST /deploy` (API key). The API either runs the core script or queues the instance.
 
 ## Configuration
 
-Main file: `server/.env` — **generated automatically** on `deployer setup` with Postgres/Redis/API/front ports, a random `JWT_SECRET`, and `DEPLOYER_ALLOW_REGISTER=false`. Connection ports are picked from free local ports when defaults (3000, 3001, 5432, 6480) are in use. Re-running `setup` updates connection settings but keeps an existing `JWT_SECRET`.
+Main file: `api/.env` — **generated automatically** on `deployer setup` with Postgres/Redis/API/web ports, a random `JWT_SECRET`, and `DEPLOYER_ALLOW_REGISTER=false`. Connection ports are picked from free local ports when defaults (3000, 3001, 5432, 6480) are in use. Re-running `setup` updates connection settings but keeps an existing `JWT_SECRET`.
 
 | Variable | Purpose |
 |----------|---------|
 | `PORT` | API listen port (default 3000) |
 | `DATABASE_URL` | Postgres (`postgresql://postgres:deployer@localhost:<port>/deployer`) |
 | `REDIS_HOST` / `REDIS_PORT` | Redis for BullMQ |
-| `CORS_ORIGIN` | Front URL allowed by the API |
+| `CORS_ORIGIN` | Web UI URL allowed by the API |
 | `DEPLOYER_WORK_ROOT` | Where branch checkouts live on disk |
 | `DEPLOYER_CORE_DIR` | Path to `core/` |
 | `JWT_SECRET` | Auth tokens (auto-generated on first setup) |
@@ -108,7 +108,7 @@ deployer down           # stop stack (confirmation)
 deployer restart        # down + setup
 deployer status         # Docker + PM2
 deployer logs api       # API logs
-deployer logs front     # front container logs
+deployer logs web       # web container logs
 deployer project init   # copy workflows + deployer.yaml into an app repo
 deployer project init ../my-app --branches main,develop
 deployer update         # git pull install dir + refresh CLI in PATH
