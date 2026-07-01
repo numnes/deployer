@@ -40,6 +40,7 @@ fi
 
 chmod +x "${INSTALL_DIR}/bin/deployer"
 chmod +x "${INSTALL_DIR}/scripts/"*.sh 2>/dev/null || true
+chmod +x "${INSTALL_DIR}/scripts/lib/"*.sh 2>/dev/null || true
 
 echo "$INSTALL_DIR" > "${CONFIG_DIR}/root"
 
