@@ -32,14 +32,19 @@ export default function SetupNginxPage() {
               <h2 className="font-medium text-[#e8eaed]">2. Wire locations into nginx</h2>
               <p className="mt-2">On the deployer host, add the include line to an existing site config:</p>
               <pre className="mt-2 overflow-x-auto rounded border border-[#3d4048] bg-[#2b2e33] p-3 text-xs text-[#d1d5db]">
-{`deployer setup nginx`}
+{`deployer setup nginx
+deployer setup nginx -f /etc/nginx/sites-enabled/mysite.conf
+deployer setup nginx --help`}
               </pre>
               <p className="mt-2">
-                Lists files in <code className="text-xs">sites-enabled</code>, lets you pick one, and
-                prints an updated config with{' '}
-                <code className="text-xs">include .../*.location;</code> inside the{' '}
-                <code className="text-xs">server {'{}'}</code> block. Copy the output and replace
-                the file contents manually (usually with <code className="text-xs">sudo nano</code>).
+                Lists files in <code className="text-xs">sites-enabled</code> (or use{' '}
+                <code className="text-xs">-f</code> / <code className="text-xs">-s</code>), prints
+                an updated config with <code className="text-xs">include .../*.location;</code>{' '}
+                inside the <code className="text-xs">server {'{}'}</code> block. Copy the output and
+                replace the file contents manually (usually with{' '}
+                <code className="text-xs">sudo nano</code>). Repeat for{' '}
+                <strong className="text-[#e8eaed]">each domain or subdomain</strong> used as a
+                project Public URL.
               </p>
               <p className="mt-2">
                 Or generate a full server snippet for a new domain:
@@ -59,10 +64,16 @@ export default function SetupNginxPage() {
             <section>
               <h2 className="font-medium text-[#e8eaed]">3. Project public URL</h2>
               <p className="mt-2">
-                Under <strong className="text-[#e8eaed]">Projects → settings</strong>, set the
-                public domain configured in nginx where preview instances are available (e.g.{' '}
-                <code className="text-xs">https://preview.example.com</code>). Branch paths are at{' '}
+                Under <strong className="text-[#e8eaed]">Projects → Settings</strong>, set the
+                public domain configured in nginx for <strong className="text-[#e8eaed]">that
+                project</strong> (e.g. <code className="text-xs">https://preview.example.com</code>
+                ). Each project can use its own host; configure nginx separately per domain or
+                subdomain. Branch paths are at{' '}
                 <code className="text-xs">{'{URL}/{branch-slug}/'}</code>.
+              </p>
+              <p className="mt-2 text-[#8b919a]">
+                Bulk actions on the same page: teardown all instances, restart all instances, or
+                delete the project.
               </p>
             </section>
 

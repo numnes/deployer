@@ -68,8 +68,9 @@ esac
 
 echo "Next steps:"
 echo ""
-echo "  deployer setup    # start the stack"
-echo "  deployer status   # check services"
-echo "  deployer down     # stop everything (with confirmation)"
-echo "  deployer help     # list commands"
+echo "  deployer setup          # start the stack"
+echo "  deployer status         # check services"
+echo "  deployer project init   # wire an app repo (after stack is up)"
+echo "  deployer setup nginx    # print nginx config with locations include"
+echo "  deployer help           # list commands"
 echo ""

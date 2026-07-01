@@ -154,17 +154,25 @@ deployer — local Deployer stack management
 
 Usage: deployer <command> [options]
 
-Commands:
-  setup, up, start   Start Postgres, Redis, web (Docker) and API (PM2)
-  setup nginx        Print nginx config with deployer locations include (manual edit)
-  down, stop         Stop API and containers (asks for confirmation)
-  restart            down + setup (asks for confirmation)
-  status             Show container and API status
-  logs [api|web]     Follow API (PM2) or web (Docker) logs
-  project init       Copy GitHub Actions + deployer.yaml into an app repo
-  update, pull       git pull + refresh CLI symlink and scripts
-  root, path         Print install directory
-  help               Show this help
+Stack:
+  setup, up, start     Start Postgres, Redis, web (Docker) and API (PM2)
+  down, stop           Stop API and containers (asks for confirmation)
+  restart              down + setup (asks for confirmation)
+  status               Show ports, Docker containers, and PM2 API
+  logs [api|web]       Follow API (PM2) or web (Docker) logs
+  update, pull         git pull + refresh CLI symlink and scripts
+  root, path           Print install directory
+
+Project:
+  project init [PATH]  Copy GitHub Actions + deployer.yaml into an app repo
+  project init --help  Options: -f/--force, --branches
+
+nginx:
+  setup nginx          Print sites-enabled config with locations include (manual edit)
+  setup nginx --help   Options: -f/--file, -s/--sites-dir
+
+Global:
+  help                 Show this help
 
 Options:
   down/restart -y, --yes   Skip confirmation
@@ -172,6 +180,7 @@ Options:
 
 Install: curl -fsSL .../scripts/install.sh | bash
 Directory: $ROOT
+Docs: README.md in the install directory
 EOF
     ;;
   *)

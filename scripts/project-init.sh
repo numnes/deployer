@@ -21,6 +21,11 @@ Options:
   --branches LIST   Comma-separated PR target branches (default: master,homologation)
   -h, --help        Show this help
 
+Environment (non-interactive):
+  DEPLOYER_PROJECT_SLUG       Project slug
+  DEPLOYER_PROJECT_GIT_URL    Git remote URL
+  DEPLOYER_PROJECT_SERVER_URL Optional public URL (nginx domain)
+
 Examples:
   deployer project init
   deployer project init ../my-app

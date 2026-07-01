@@ -174,16 +174,24 @@ export default function SetupGithubActionsPage() {
                 <strong className="text-[#b8bcc4]">Setup → Secrets</strong>.
               </p>
               <p className="mt-2 text-[#8b919a]">
-                Non-interactive overrides:{' '}
+                Non-interactive env vars for <code className="text-xs">deployer project init</code>:{' '}
                 <code className="text-xs">DEPLOYER_PROJECT_SLUG</code>,{' '}
                 <code className="text-xs">DEPLOYER_PROJECT_GIT_URL</code>,{' '}
-                <code className="text-xs">DEPLOYER_PROJECT_SERVER_URL</code> (CLI env vars for{' '}
-                <code className="text-xs">deployer project init</code> only).
+                <code className="text-xs">DEPLOYER_PROJECT_SERVER_URL</code> (optional).
               </p>
             </section>
 
             <section>
-              <h2 className="font-medium text-[#e8eaed]">5. Deploy flow</h2>
+              <h2 className="font-medium text-[#e8eaed]">5. Instances</h2>
+              <p className="mt-2">
+                Open <strong className="text-[#e8eaed]">Instances</strong> to list previews, filter
+                by project/branch or status, and open a row for logs, pause, restart, or destroy.
+                Status cards on the dashboard link here with the status filter applied.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="font-medium text-[#e8eaed]">6. Deploy flow</h2>
               <ol className="mt-2 list-inside list-decimal space-y-1">
                 <li>PR opened/updated triggers the workflow</li>
                 <li>
