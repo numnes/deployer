@@ -23,8 +23,8 @@ deployer setup    # Postgres + Redis + web (Docker) + API (PM2)
 deployer status   # check services
 ```
 
-- **Dashboard:** http://localhost:3001 (or the port shown after `deployer setup`)  
-- **API / Swagger:** http://localhost:3000/docs (API port may differ if 3000 is busy)  
+- **Dashboard:** http://localhost:3001 (or the port shown after `deployer setup`)
+- **API / Swagger:** http://localhost:3000/docs (API port may differ if 3000 is busy)
 
 On first setup you'll be prompted for an admin email and password.
 
@@ -48,9 +48,9 @@ deployer project init
 
 This copies:
 
-- `.github/workflows/deploy-preview.yml` — deploy on PR open/update  
-- `.github/workflows/teardown-preview.yml` — remove preview on PR close  
-- `deployer.yaml` — build commands and PM2 entrypoint for your stack  
+- `.github/workflows/deploy-preview.yml` — deploy on PR open/update
+- `.github/workflows/teardown-preview.yml` — remove preview on PR close
+- `deployer.yaml` — build commands and PM2 entrypoint for your stack
 
 The command detects `gitUrl` and `slug` when possible, asks for anything missing, embeds the project slug in the workflow files, and prints a **registration JSON** block:
 
@@ -83,9 +83,9 @@ deployer project init
 
 ### 2. Register the project in the dashboard
 
-1. Copy the JSON printed by `deployer project init`  
-2. Open **Projects → Add project → Import registration JSON**  
-3. Paste the JSON and click **Create from JSON** (or **Apply to form** to review first)  
+1. Copy the JSON printed by `deployer project init`
+2. Open **Projects → Add project → Import registration JSON**
+3. Paste the JSON and click **Create from JSON** (or **Apply to form** to review first)
 4. Set the **Public URL** if you already know the domain where previews will be served (see [Configure nginx](#configure-nginx) below)
 
 ### 3. Create an API key
@@ -96,10 +96,10 @@ In the dashboard: **Users → API Keys** → create a key and save the value (sh
 
 In the **app repo** on GitHub: **Settings → Secrets and variables → Actions**
 
-| Secret | Value |
-|--------|--------|
+| Secret             | Value                                                                                    |
+| ------------------ | ---------------------------------------------------------------------------------------- |
 | `DEPLOYER_API_URL` | Public URL of your deployer API (no trailing slash), e.g. `https://deployer.example.com` |
-| `DEPLOYER_API_KEY` | API key from step 3 |
+| `DEPLOYER_API_KEY` | API key from step 3                                                                      |
 
 The project slug is already set in the workflow files — no extra GitHub variable is required.
 
@@ -119,8 +119,8 @@ Preview URLs are served by **nginx on the deployer host**. The core writes one `
 
 ### Per domain / subdomain
 
-1. **Pick the hostname** for the project (e.g. `preview.myapp.example.com`).  
-2. **Add or update a site** in nginx (`sites-available` / `sites-enabled`, or your distro’s layout).  
+1. **Pick the hostname** for the project (e.g. `preview.myapp.example.com`).
+2. **Add or update a site** in nginx (`sites-available` / `sites-enabled`, or your distro’s layout).
 3. **Include deployer locations** inside the `server { }` block for that hostname:
 
    ```nginx
@@ -137,18 +137,9 @@ Preview URLs are served by **nginx on the deployer host**. The core writes one `
 
    It lists configs in `sites-enabled` (or the directory you pass), shows the file with the `include` line added, and tells you to replace the file contents manually (e.g. `sudo nano …`), then run `sudo nginx -t && sudo nginx -s reload`.
 
-4. **Generate a server snippet** for a new domain (optional starting point):
+4. In the dashboard, set the project **Public URL** to that host (e.g. `https://preview.myapp.example.com`). Branch previews are at `{Public URL}/{branch-slug}/`.
 
-   ```bash
-   export DEPLOYER_WORK_ROOT=/path/to/work   # if not default
-   ./core/bin/setup-nginx.sh preview.myapp.example.com
-   ```
-
-   This creates `~/deployer/locations/nginx-server-snippet.conf` with a sample `server { }` block. Adjust `listen`, SSL, and copy into your system nginx.
-
-5. In the dashboard, set the project **Public URL** to that host (e.g. `https://preview.myapp.example.com`). Branch previews are at `{Public URL}/{branch-slug}/`.
-
-6. After deploys, the core reloads nginx when location files change. After **editing site configs by hand**, test and reload:
+5. After deploys, the core reloads nginx when location files change. After **editing site configs by hand**, test and reload:
 
    ```bash
    sudo nginx -t && sudo nginx -s reload
@@ -160,35 +151,35 @@ Verify from the dashboard: **Setup → Nginx** (directory, `nginx -t`, process c
 
 After `deployer setup`, open the web UI (port shown in `deployer status`, often **3001**).
 
-| Area | What you can do |
-|------|------------------|
-| **Dashboard** | Host CPU / memory / disk, instance counts by status (click a status to open **Instances** filtered), active slot usage chart, recent activity |
-| **Projects** | List projects, **Add project** (manual form or import registration JSON), open **Settings** per project |
+| Area                    | What you can do                                                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dashboard**           | Host CPU / memory / disk, instance counts by status (click a status to open **Instances** filtered), active slot usage chart, recent activity                                         |
+| **Projects**            | List projects, **Add project** (manual form or import registration JSON), open **Settings** per project                                                                               |
 | **Projects → Settings** | Set **Public URL** (nginx domain for that project), **Teardown all instances** (pause active), **Restart all instances**, **Delete project** (destroys all instances and the project) |
-| **Instances** | List all previews; filter by project/branch search and status; open a row for logs and pause/restart/destroy |
-| **Settings** | Global **max active instances** — excess deploys stay `waiting` until a slot frees up |
-| **Setup** | Guides for GitHub Actions, secrets, and nginx |
-| **Users → API Keys** | Create keys used by GitHub Actions (`DEPLOYER_API_KEY`) |
+| **Instances**           | List all previews; filter by project/branch search and status; open a row for logs and pause/restart/destroy                                                                          |
+| **Settings**            | Global **max active instances** — excess deploys stay `waiting` until a slot frees up                                                                                                 |
+| **Setup**               | Guides for GitHub Actions, secrets, and nginx                                                                                                                                         |
+| **Users → API Keys**    | Create keys used by GitHub Actions (`DEPLOYER_API_KEY`)                                                                                                                               |
 
 Instance status cards on the home dashboard link to `/instances?status=…` with the filter applied.
 
 ## Documentation
 
-| Topic | Where |
-|-------|--------|
-| Dashboard | [Dashboard](#dashboard) |
-| Project setup | [Setup in a project](#setup-in-a-project) · `deployer project init` |
+| Topic             | Where                                                                            |
+| ----------------- | -------------------------------------------------------------------------------- |
+| Dashboard         | [Dashboard](#dashboard)                                                          |
+| Project setup     | [Setup in a project](#setup-in-a-project) · `deployer project init`              |
 | nginx on the host | [Configure nginx](#configure-nginx) · `deployer setup nginx` · **Setup → Nginx** |
-| GitHub Actions | Dashboard **Setup → GitHub Actions** |
-| Secrets | Dashboard **Setup → Secrets** (or [Setup in a project](#setup-in-a-project)) |
-| App config | `examples/deployer.yaml` in each project repo |
-| API reference | http://localhost:3000/docs after `deployer setup` |
+| GitHub Actions    | Dashboard **Setup → GitHub Actions**                                             |
+| Secrets           | Dashboard **Setup → Secrets** (or [Setup in a project](#setup-in-a-project))     |
+| App config        | `examples/deployer.yaml` in each project repo                                    |
+| API reference     | http://localhost:3000/docs after `deployer setup`                                |
 
 ### GitHub secrets (in your app repo)
 
-| Name | Description |
-|------|-------------|
-| `DEPLOYER_API_URL` | Base URL of your deployer API |
+| Name               | Description                       |
+| ------------------ | --------------------------------- |
+| `DEPLOYER_API_URL` | Base URL of your deployer API     |
 | `DEPLOYER_API_KEY` | API key from **Users → API Keys** |
 
 The project slug is embedded in the workflow files when you run `deployer project init` (no GitHub variable needed).
@@ -197,26 +188,26 @@ The project slug is embedded in the workflow files when you run `deployer projec
 
 - **One URL per branch** — e.g. `https://preview.example.com/feature-xyz/`
 - **Queue when full** — excess deploys stay registered as `waiting` until you pause or remove an instance
-- **Pause / resume / redeploy** — per instance in the dashboard, or **Restart all instances** on a project  
-- **Teardown on PR close** — optional workflow removes the instance automatically  
-- **Bulk teardown** — **Projects → Settings → Teardown all instances** pauses every active instance for a project  
+- **Pause / resume / redeploy** — per instance in the dashboard, or **Restart all instances** on a project
+- **Teardown on PR close** — optional workflow removes the instance automatically
+- **Bulk teardown** — **Projects → Settings → Teardown all instances** pauses every active instance for a project
 - **Delete project** — removes the project and destroys all its instances (PM2, nginx, database)
 
 ### Instance states
 
-| Status | Meaning |
-|--------|---------|
-| `active` | Running on the host (PM2 + nginx) |
-| `waiting` | Registered, waiting for a free slot |
-| `deploying` | Deploy job in progress |
-| `paused` | Stopped on the host, still in the database |
-| `error` | Last deploy or activate failed |
+| Status      | Meaning                                    |
+| ----------- | ------------------------------------------ |
+| `active`    | Running on the host (PM2 + nginx)          |
+| `waiting`   | Registered, waiting for a free slot        |
+| `deploying` | Deploy job in progress                     |
+| `paused`    | Stopped on the host, still in the database |
+| `error`     | Last deploy or activate failed             |
 
 ## Architecture (short)
 
-- **`core/`** — Bash scripts: clone, build, PM2, nginx locations, pause, destroy  
-- **`api/`** — NestJS API, Postgres, BullMQ/Redis job queue  
-- **`web/`** — Next.js dashboard (instances, projects, setup guides)  
+- **`core/`** — Bash scripts: clone, build, PM2, nginx locations, pause, destroy
+- **`api/`** — NestJS API, Postgres, BullMQ/Redis job queue
+- **`web/`** — Next.js dashboard (instances, projects, setup guides)
 
 Deploy is triggered with `POST /deploy` (API key). The API either runs the core script or queues the instance.
 
@@ -224,18 +215,18 @@ Deploy is triggered with `POST /deploy` (API key). The API either runs the core 
 
 Main file: `api/.env` — **generated automatically** on `deployer setup` with Postgres/Redis/API/web ports, a random `JWT_SECRET`, and `DEPLOYER_ALLOW_REGISTER=false`. Connection ports are picked from free local ports when defaults (3000, 3001, 5432, 6480) are in use. Re-running `setup` updates connection settings but keeps an existing `JWT_SECRET`.
 
-| Variable | Purpose |
-|----------|---------|
-| `PORT` | API listen port (default 3000) |
-| `DATABASE_URL` | Postgres (`postgresql://postgres:deployer@localhost:<port>/deployer`) |
-| `REDIS_HOST` / `REDIS_PORT` | Redis for BullMQ |
-| `CORS_ORIGIN` | Web UI URL allowed by the API |
-| `DEPLOYER_WORK_ROOT` | Where branch checkouts live on disk |
-| `DEPLOYER_CORE_DIR` | Path to `core/` |
-| `DEPLOYER_LOCATIONS_DIR` | nginx `*.location` files (default `~/deployer/locations`) |
-| `JWT_SECRET` | Auth tokens (auto-generated on first setup) |
-| `DEPLOYER_ALLOW_REGISTER` | Public sign-up (`false` by default after setup) |
-| `TYPEORM_SYNC` | `true` for dev schema sync |
+| Variable                    | Purpose                                                               |
+| --------------------------- | --------------------------------------------------------------------- |
+| `PORT`                      | API listen port (default 3000)                                        |
+| `DATABASE_URL`              | Postgres (`postgresql://postgres:deployer@localhost:<port>/deployer`) |
+| `REDIS_HOST` / `REDIS_PORT` | Redis for BullMQ                                                      |
+| `CORS_ORIGIN`               | Web UI URL allowed by the API                                         |
+| `DEPLOYER_WORK_ROOT`        | Where branch checkouts live on disk                                   |
+| `DEPLOYER_CORE_DIR`         | Path to `core/`                                                       |
+| `DEPLOYER_LOCATIONS_DIR`    | nginx `*.location` files (default `~/deployer/locations`)             |
+| `JWT_SECRET`                | Auth tokens (auto-generated on first setup)                           |
+| `DEPLOYER_ALLOW_REGISTER`   | Public sign-up (`false` by default after setup)                       |
+| `TYPEORM_SYNC`              | `true` for dev schema sync                                            |
 
 Skip or automate admin user creation:
 
@@ -250,34 +241,34 @@ On restart, if users already exist you are asked whether to reset a password or 
 
 ### Stack commands
 
-| Command | Description |
-|---------|-------------|
-| `deployer setup` | Start Postgres, Redis, web (Docker) and API (PM2); creates/updates `api/.env` |
-| `deployer up`, `deployer start` | Same as `deployer setup` |
-| `deployer down`, `deployer stop` | Stop API and containers (asks for confirmation) |
-| `deployer restart` | `down` then `setup` (asks for confirmation) |
-| `deployer status` | Show ports, Docker containers, and PM2 API process |
-| `deployer logs api` | Follow API logs (PM2) |
-| `deployer logs web` | Follow web container logs |
-| `deployer update`, `deployer pull` | `git pull` in the install dir + refresh CLI symlink |
-| `deployer root`, `deployer path` | Print install directory |
-| `deployer help` | Show command summary |
+| Command                            | Description                                                                   |
+| ---------------------------------- | ----------------------------------------------------------------------------- |
+| `deployer setup`                   | Start Postgres, Redis, web (Docker) and API (PM2); creates/updates `api/.env` |
+| `deployer up`, `deployer start`    | Same as `deployer setup`                                                      |
+| `deployer down`, `deployer stop`   | Stop API and containers (asks for confirmation)                               |
+| `deployer restart`                 | `down` then `setup` (asks for confirmation)                                   |
+| `deployer status`                  | Show ports, Docker containers, and PM2 API process                            |
+| `deployer logs api`                | Follow API logs (PM2)                                                         |
+| `deployer logs web`                | Follow web container logs                                                     |
+| `deployer update`, `deployer pull` | `git pull` in the install dir + refresh CLI symlink                           |
+| `deployer root`, `deployer path`   | Print install directory                                                       |
+| `deployer help`                    | Show command summary                                                          |
 
 Options for `down` / `restart`: `-y`, `--yes`, or `DEPLOYER_YES=1` to skip confirmation.
 
 ### Project commands
 
-| Command | Description |
-|---------|-------------|
-| `deployer project init` | Copy workflows + `deployer.yaml` into an app repo; print registration JSON |
-| `deployer project init --help` | Options: `PATH`, `-f`/`--force`, `--branches` |
+| Command                        | Description                                                                |
+| ------------------------------ | -------------------------------------------------------------------------- |
+| `deployer project init`        | Copy workflows + `deployer.yaml` into an app repo; print registration JSON |
+| `deployer project init --help` | Options: `PATH`, `-f`/`--force`, `--branches`                              |
 
 ### nginx helper
 
-| Command | Description |
-|---------|-------------|
-| `deployer setup nginx` | List `sites-enabled`, print config with `include …/*.location;` (manual paste) |
-| `deployer setup nginx --help` | Options: `-f`/`--file`, `-s`/`--sites-dir` |
+| Command                       | Description                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------ |
+| `deployer setup nginx`        | List `sites-enabled`, print config with `include …/*.location;` (manual paste) |
+| `deployer setup nginx --help` | Options: `-f`/`--file`, `-s`/`--sites-dir`                                     |
 
 ### Examples
 
@@ -294,17 +285,17 @@ deployer update
 
 ### Install & runtime env vars
 
-| Variable | Purpose |
-|----------|---------|
-| `DEPLOYER_INSTALL_DIR` | Clone destination for `install.sh` (default `~/deployer`) |
-| `DEPLOYER_REPO_URL` | Git URL for `install.sh` |
-| `DEPLOYER_BIN_DIR` | Where to link the `deployer` executable (default `~/.local/bin`) |
-| `DEPLOYER_ROOT` | Override install directory for the CLI |
-| `DEPLOYER_YES` | Skip confirmation on `down` / `restart` |
-| `DEPLOYER_PROJECT_SLUG` | Non-interactive slug for `project init` |
-| `DEPLOYER_PROJECT_GIT_URL` | Non-interactive git URL for `project init` |
-| `DEPLOYER_PROJECT_SERVER_URL` | Optional Public URL for `project init` |
-| `NGINX_SITES_ENABLED` | Default directory for `setup nginx` (default `/etc/nginx/sites-enabled`) |
+| Variable                      | Purpose                                                                  |
+| ----------------------------- | ------------------------------------------------------------------------ |
+| `DEPLOYER_INSTALL_DIR`        | Clone destination for `install.sh` (default `~/deployer`)                |
+| `DEPLOYER_REPO_URL`           | Git URL for `install.sh`                                                 |
+| `DEPLOYER_BIN_DIR`            | Where to link the `deployer` executable (default `~/.local/bin`)         |
+| `DEPLOYER_ROOT`               | Override install directory for the CLI                                   |
+| `DEPLOYER_YES`                | Skip confirmation on `down` / `restart`                                  |
+| `DEPLOYER_PROJECT_SLUG`       | Non-interactive slug for `project init`                                  |
+| `DEPLOYER_PROJECT_GIT_URL`    | Non-interactive git URL for `project init`                               |
+| `DEPLOYER_PROJECT_SERVER_URL` | Optional Public URL for `project init`                                   |
+| `NGINX_SITES_ENABLED`         | Default directory for `setup nginx` (default `/etc/nginx/sites-enabled`) |
 
 ## License
 
