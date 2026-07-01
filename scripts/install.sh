@@ -38,15 +38,7 @@ else
   git clone "$REPO_URL" "$INSTALL_DIR"
 fi
 
-chmod +x "${INSTALL_DIR}/bin/deployer"
-chmod +x "${INSTALL_DIR}/scripts/"*.sh 2>/dev/null || true
-chmod +x "${INSTALL_DIR}/scripts/lib/"*.sh 2>/dev/null || true
-
-echo "$INSTALL_DIR" > "${CONFIG_DIR}/root"
-
-LINK="${BIN_DIR}/deployer"
-ln -sf "${INSTALL_DIR}/bin/deployer" "$LINK"
-log "Executable: ${LINK} → ${INSTALL_DIR}/bin/deployer"
+DEPLOYER_BIN_DIR="$BIN_DIR" bash "${INSTALL_DIR}/scripts/sync-cli.sh"
 
 if [[ ! -f "${INSTALL_DIR}/server/.env" ]]; then
   if [[ -f "${INSTALL_DIR}/server/.env.example" ]]; then
