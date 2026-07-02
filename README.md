@@ -313,4 +313,6 @@ deployer update
 
 ## License
 
-See repository license file when added. Built for teams who want simple, self-hosted preview environments.
+Licensed under the [Apache License, Version 2.0](LICENSE).
+
+Built for teams who want simple, self-hosted preview environments.
