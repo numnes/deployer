@@ -2,6 +2,7 @@
 
 import { PageContainer } from '@/components/PageContainer';
 import { PageHeader } from '@/components/PageHeader';
+import { ReloadButton } from '@/components/ReloadButton';
 import { RequireAuth } from '@/components/RequireAuth';
 import {
   IconCpu,
@@ -13,7 +14,7 @@ import {
   IconStatusPaused,
   IconStatusWaiting,
 } from '@/components/icons';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   Cell,
@@ -114,22 +115,19 @@ export default function HomePage() {
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const d = await fetchDashboardSummary();
-        if (!alive) return;
-        setData(d);
-      } catch {
-        if (!alive) return;
-        setErr('Could not load dashboard.');
-      }
-    })();
-    return () => {
-      alive = false;
-    };
+  const load = useCallback(async () => {
+    setErr(null);
+    try {
+      const d = await fetchDashboardSummary();
+      setData(d);
+    } catch {
+      setErr('Could not load dashboard.');
+    }
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const cpuPct =
     data != null ? cpuLoadPct(data.host.cpu.loadavg1, data.host.cpu.cores) : null;
@@ -153,6 +151,7 @@ export default function HomePage() {
         <PageHeader
           title="Dashboard"
           subtitle="Host resources and preview instance activity."
+          action={<ReloadButton onReload={load} title="Reload dashboard" />}
         />
         {err ? <div className="alert-error mb-4">{err}</div> : null}
         <div className="grid gap-5 lg:grid-cols-2">

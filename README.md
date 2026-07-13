@@ -227,7 +227,7 @@ Deploy is triggered with `POST /deploy` (API key), typically from GitHub Actions
 
 ## Configuration
 
-Main file: `api/.env` — **generated automatically** on `deployer setup` with Postgres/Redis/API/web ports, a random `JWT_SECRET`, and `DEPLOYER_ALLOW_REGISTER=false`. Connection ports are picked from free local ports when defaults (3000, 3001, 5432, 6480) are in use. Re-running `setup` updates connection settings but keeps an existing `JWT_SECRET`.
+Main file: `api/.env` — **generated automatically** on `deployer setup` with Postgres/Redis/API/web ports, a random `JWT_SECRET`, and a random `DEPLOYER_SETUP_KEY`. Connection ports are picked from free local ports when defaults (3000, 3001, 5432, 6480) are in use. Re-running `setup` updates connection settings but keeps an existing `JWT_SECRET` and `DEPLOYER_SETUP_KEY`.
 
 | Variable                    | Purpose                                                               |
 | --------------------------- | --------------------------------------------------------------------- |
@@ -239,8 +239,20 @@ Main file: `api/.env` — **generated automatically** on `deployer setup` with P
 | `DEPLOYER_CORE_DIR`         | Path to `core/`                                                       |
 | `DEPLOYER_LOCATIONS_DIR`    | nginx `*.location` files (default `~/deployer/locations`)             |
 | `JWT_SECRET`                | Auth tokens (auto-generated on first setup)                           |
-| `DEPLOYER_ALLOW_REGISTER`   | Public sign-up (`false` by default after setup)                       |
+| `DEPLOYER_SETUP_KEY`        | Root-only key for privileged bootstrap endpoints (auto-generated)     |
 | `TYPEORM_SYNC`              | `true` for dev schema sync                                            |
+
+### Privileged endpoints (setup key)
+
+`POST /auth/register` and `GET /users` are not public. They require either a
+valid dashboard JWT or the root-only **setup key** sent in the
+`X-Deployer-Setup-Key` header. The key lives only on the root machine in
+`api/.env` (`DEPLOYER_SETUP_KEY`), so these endpoints stay safe even when the
+API is publicly exposed. `POST /auth/register` accepts **only** the setup key;
+`GET /users` accepts the JWT (dashboard) or the setup key (setup script).
+
+The setup script (`seed-default-user.js`) uses these endpoints with the setup key
+instead of connecting to Postgres directly.
 
 Skip or automate admin user creation:
 

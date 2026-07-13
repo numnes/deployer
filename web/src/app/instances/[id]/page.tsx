@@ -2,6 +2,7 @@
 
 import { PageContainer } from '@/components/PageContainer';
 import { PageHeader } from '@/components/PageHeader';
+import { ReloadButton } from '@/components/ReloadButton';
 import { RequireAuth } from '@/components/RequireAuth';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -69,6 +70,10 @@ export default function InstanceDetailPage() {
     void loadLogs();
   }, [row, loadLogs]);
 
+  const reloadAll = useCallback(async () => {
+    await Promise.all([loadDetail(), loadLogs()]);
+  }, [loadDetail, loadLogs]);
+
   return (
     <RequireAuth>
       <PageContainer>
@@ -93,6 +98,7 @@ export default function InstanceDetailPage() {
                   branch <span className="font-mono text-[#e8eaed]">{row.branch}</span>
                 </>
               }
+              action={<ReloadButton onReload={reloadAll} title="Reload instance" />}
             />
 
             {row.status === 'error' && row.lastDeployError ? (

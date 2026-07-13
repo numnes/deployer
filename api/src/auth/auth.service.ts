@@ -1,9 +1,7 @@
 import {
-  ConflictException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -18,18 +16,16 @@ export class AuthService {
     @InjectRepository(User)
     private readonly users: Repository<User>,
     private readonly jwt: JwtService,
-    private readonly config: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
-    if (this.config.get<string>('DEPLOYER_ALLOW_REGISTER') !== 'true') {
-      throw new UnauthorizedException('Registro desabilitado');
-    }
     const existing = await this.users.findOne({ where: { email: dto.email } });
-    if (existing) {
-      throw new ConflictException('E-mail já cadastrado');
-    }
     const passwordHash = await bcrypt.hash(dto.password, 12);
+    if (existing) {
+      existing.passwordHash = passwordHash;
+      await this.users.save(existing);
+      return this.issueTokens(existing);
+    }
     const user = this.users.create({ email: dto.email, passwordHash });
     await this.users.save(user);
     return this.issueTokens(user);

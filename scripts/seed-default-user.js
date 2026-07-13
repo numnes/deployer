@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Create or update admin user in Postgres.
+ * Create or update admin user via Deployer API (setup key).
  *
  * Usage:
  *   node scripts/seed-default-user.js count
@@ -9,70 +9,103 @@
  */
 const fs = require('fs');
 const path = require('path');
-const bcrypt = require(path.join(__dirname, '../api/node_modules/bcrypt'));
-const { Client } = require(path.join(__dirname, '../api/node_modules/pg'));
 
 const ROOT = path.join(__dirname, '..');
 const ENV_PATH = path.join(ROOT, 'api', '.env');
+const SETUP_KEY_HEADER = 'x-deployer-setup-key';
 
-function loadDatabaseUrl() {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  if (fs.existsSync(ENV_PATH)) {
-    const line = fs
-      .readFileSync(ENV_PATH, 'utf8')
-      .split('\n')
-      .filter((l) => l.startsWith('DATABASE_URL='))
-      .pop();
-    if (line) {
-      const val = line.slice('DATABASE_URL='.length).trim();
-      if (val) return val;
+function loadEnvVar(key) {
+  if (process.env[key]) return process.env[key].trim();
+  if (!fs.existsSync(ENV_PATH)) return '';
+  const line = fs
+    .readFileSync(ENV_PATH, 'utf8')
+    .split('\n')
+    .filter((l) => l.startsWith(`${key}=`))
+    .pop();
+  if (!line) return '';
+  return line
+    .slice(key.length + 1)
+    .trim()
+    .replace(/^["']|["']$/g, '');
+}
+
+function apiBase() {
+  const fromEnv = (process.env.DEPLOYER_API_URL || '').trim();
+  if (fromEnv) return fromEnv.replace(/\/$/, '');
+  const port = loadEnvVar('PORT') || '3000';
+  return `http://127.0.0.1:${port}`;
+}
+
+function setupKey() {
+  const key = (process.env.DEPLOYER_SETUP_KEY || loadEnvVar('DEPLOYER_SETUP_KEY')).trim();
+  if (!key) {
+    throw new Error(
+      'DEPLOYER_SETUP_KEY não encontrada. Rode deployer setup ou defina em api/.env.',
+    );
+  }
+  return key;
+}
+
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForApi() {
+  const base = apiBase();
+  for (let i = 0; i < 30; i += 1) {
+    try {
+      const res = await fetch(`${base}/docs`, { method: 'GET' });
+      if (res.ok || res.status === 301 || res.status === 302) return;
+    } catch {
+      // API ainda não disponível
     }
+    await sleep(1000);
   }
-  return 'postgresql://postgres:deployer@localhost:5432/deployer';
+  throw new Error(`API não respondeu em ${base}. Confirme que deployer-api está rodando.`);
 }
 
-function isMissingUsersTable(err) {
-  const msg = String(err?.message || err || '');
-  return (
-    err?.code === '42P01' ||
-    /relation "users" does not exist/i.test(msg)
-  );
-}
+async function apiFetch(path, options = {}) {
+  const res = await fetch(`${apiBase()}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      [SETUP_KEY_HEADER]: setupKey(),
+      ...(options.headers || {}),
+    },
+  });
 
-async function withClient(fn) {
-  const client = new Client({ connectionString: loadDatabaseUrl() });
-  await client.connect();
+  const text = await res.text();
+  let body;
   try {
-    return await fn(client);
-  } finally {
-    await client.end();
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = text;
   }
+
+  if (!res.ok) {
+    const msg =
+      (body && typeof body === 'object' && (body.message || body.error)) ||
+      text ||
+      `HTTP ${res.status}`;
+    throw new Error(Array.isArray(msg) ? msg.join('; ') : String(msg));
+  }
+
+  return body;
+}
+
+async function listUsers() {
+  const rows = await apiFetch('/users');
+  return Array.isArray(rows) ? rows : [];
 }
 
 async function countUsers() {
-  try {
-    return await withClient(async (client) => {
-      const res = await client.query('SELECT COUNT(*)::int AS count FROM users');
-      return res.rows[0]?.count ?? 0;
-    });
-  } catch (e) {
-    if (isMissingUsersTable(e)) return 0;
-    throw e;
-  }
+  const rows = await listUsers();
+  return rows.length;
 }
 
 async function listUserEmails() {
-  try {
-    return await withClient(async (client) => {
-      const res = await client.query(
-        'SELECT email FROM users ORDER BY created_at ASC LIMIT 10',
-      );
-      return res.rows.map((r) => r.email);
-    });
-  } catch (e) {
-    if (isMissingUsersTable(e)) return [];
-    throw e;
-  }
+  const rows = await listUsers();
+  return rows.map((r) => r.email).filter(Boolean);
 }
 
 async function seedUser() {
@@ -92,27 +125,21 @@ async function seedUser() {
     process.exit(1);
   }
 
-  const passwordHash = await bcrypt.hash(password, 12);
-
-  await withClient(async (client) => {
-    const existing = await client.query('SELECT id FROM users WHERE email = $1', [email]);
-    if (existing.rowCount > 0) {
-      await client.query('UPDATE users SET password_hash = $1 WHERE email = $2', [
-        passwordHash,
-        email,
-      ]);
-      console.log(`[seed-user] Password updated for ${email}`);
-    } else {
-      await client.query(
-        'INSERT INTO users (id, email, password_hash, created_at) VALUES (gen_random_uuid(), $1, $2, NOW())',
-        [email, passwordHash],
-      );
-      console.log(`[seed-user] User created: ${email}`);
-    }
+  const existing = (await listUsers()).some((u) => u.email === email);
+  await apiFetch('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
   });
+
+  if (existing) {
+    console.log(`[seed-user] Password updated for ${email}`);
+  } else {
+    console.log(`[seed-user] User created: ${email}`);
+  }
 }
 
 async function main() {
+  await waitForApi();
   const mode = process.argv[2];
 
   if (mode === 'count') {

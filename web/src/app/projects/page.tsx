@@ -2,11 +2,12 @@
 
 import { PageContainer } from "@/components/PageContainer";
 import { PageHeader } from "@/components/PageHeader";
+import { ReloadButton } from "@/components/ReloadButton";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ClientTable } from "@/components/ClientTable";
 import { parseProjectRegistrationJson } from "@/lib/project-registration-json";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createProject, listProjects, type Project } from "./::handlers/projects";
 
 export default function ProjectsPage() {
@@ -22,22 +23,19 @@ export default function ProjectsPage() {
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const data = await listProjects();
-        if (!alive) return;
-        setProjects(data);
-      } catch {
-        if (!alive) return;
-        setError("Could not load projects.");
-      }
-    })();
-    return () => {
-      alive = false;
-    };
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      const data = await listProjects();
+      setProjects(data);
+    } catch {
+      setError("Could not load projects.");
+    }
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   async function submitProject(fields: {
     slug: string;
@@ -89,17 +87,20 @@ export default function ProjectsPage() {
           title="Projects"
           subtitle="Slugs are used by the GitHub Action when calling deploy. Run deployer project init in your app repo to get a registration JSON."
           action={
-            <button
-              type="button"
-              className="btn btn-success"
-              onClick={() => {
-                setShowForm((v) => !v);
-                setFormError(null);
-                setImportError(null);
-              }}
-            >
-              {showForm ? "Cancel" : "Add project"}
-            </button>
+            <div className="flex items-center gap-2">
+              <ReloadButton onReload={load} title="Reload projects" />
+              <button
+                type="button"
+                className="btn btn-success"
+                onClick={() => {
+                  setShowForm((v) => !v);
+                  setFormError(null);
+                  setImportError(null);
+                }}
+              >
+                {showForm ? "Cancel" : "Add project"}
+              </button>
+            </div>
           }
         />
 

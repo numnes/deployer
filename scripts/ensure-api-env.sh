@@ -69,6 +69,13 @@ if [[ -z "$jwt" ]]; then
   jwt="$(generate_jwt_secret)"
 fi
 
+# Chave usada pelo processo de setup (na máquina root) para autenticar em
+# endpoints privilegiados (register / listar usuários) sem expô-los publicamente.
+setup_key="$(get_env_var DEPLOYER_SETUP_KEY || true)"
+if [[ -z "$setup_key" ]]; then
+  setup_key="$(generate_jwt_secret)"
+fi
+
 work_root="${HOME}/.local/share/deployer"
 core_dir="${ROOT_DIR}/core"
 
@@ -80,7 +87,7 @@ set_env_var REDIS_HOST "127.0.0.1"
 set_env_var REDIS_PORT "$REDIS_PORT"
 set_env_var DEPLOYER_WORK_ROOT "$work_root"
 set_env_var DEPLOYER_CORE_DIR "$core_dir"
-set_env_var DEPLOYER_ALLOW_REGISTER "false"
+set_env_var DEPLOYER_SETUP_KEY "$setup_key"
 set_env_var CORS_ORIGIN "http://localhost:${WEB_PORT}"
 
 echo "[ensure-env] api/.env updated (API :${API_PORT}, Postgres :${POSTGRES_PORT}, Redis :${REDIS_PORT}, Web :${WEB_PORT})"

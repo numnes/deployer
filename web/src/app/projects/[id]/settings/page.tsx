@@ -2,10 +2,11 @@
 
 import { PageContainer } from '@/components/PageContainer';
 import { PageHeader } from '@/components/PageHeader';
+import { ReloadButton } from '@/components/ReloadButton';
 import { RequireAuth } from '@/components/RequireAuth';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { listInstances } from '../../../instances/::handlers/instances';
 import {
   deleteProject,
@@ -31,26 +32,24 @@ export default function ProjectSettingsPage() {
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const [p, instances] = await Promise.all([getProject(id), listInstances()]);
-        if (!alive) return;
-        setProject(p);
-        setServerUrl(p.serverUrl ?? '');
-        setInstanceCount(instances.filter((i) => i.projectId === id).length);
-      } catch {
-        if (!alive) return;
-        setError('Project not found or access denied.');
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
+  const load = useCallback(async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const [p, instances] = await Promise.all([getProject(id), listInstances()]);
+      setProject(p);
+      setServerUrl(p.serverUrl ?? '');
+      setInstanceCount(instances.filter((i) => i.projectId === id).length);
+    } catch {
+      setError('Project not found or access denied.');
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   return (
     <RequireAuth>
@@ -71,6 +70,7 @@ export default function ProjectSettingsPage() {
               </>
             ) : undefined
           }
+          action={<ReloadButton onReload={load} title="Reload project" />}
         />
         <div className="card p-5">
           {loading ? (

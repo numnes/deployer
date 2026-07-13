@@ -34,6 +34,7 @@ async function bootstrap() {
       'Content-Type',
       'Authorization',
       'X-Deployer-Api-Key',
+      'X-Deployer-Setup-Key',
       'X-Requested-With',
     ],
     maxAge: 86400,
@@ -67,6 +68,16 @@ async function bootstrap() {
         description: 'Chave usada para endpoints de deploy',
       },
       'deploy-api-key',
+    )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        in: 'header',
+        name: 'x-deployer-setup-key',
+        description:
+          'Chave gerada na máquina root (DEPLOYER_SETUP_KEY) para bootstrap de usuários',
+      },
+      'setup-key',
     )
     .build();
 

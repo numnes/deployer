@@ -2,11 +2,12 @@
 
 import { PageContainer } from '@/components/PageContainer';
 import { PageHeader } from '@/components/PageHeader';
+import { ReloadButton } from '@/components/ReloadButton';
 import { RequireAuth } from '@/components/RequireAuth';
 import { ClientTable } from '@/components/ClientTable';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { listInstances, runnerLabel, type InstanceRow } from './::handlers/instances';
 
 const INSTANCE_STATUSES = ['waiting', 'deploying', 'active', 'paused', 'error'] as const;
@@ -64,22 +65,19 @@ function InstancesPageContent() {
     setStatusFilter(normalizeStatus(searchParams.get('status')));
   }, [searchParams]);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const data = await listInstances();
-        if (!alive) return;
-        setInstances(data);
-      } catch {
-        if (!alive) return;
-        setError('Could not load instances.');
-      }
-    })();
-    return () => {
-      alive = false;
-    };
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      const data = await listInstances();
+      setInstances(data);
+    } catch {
+      setError('Could not load instances.');
+    }
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   function syncUrl(nextSearch: string, nextStatus: string) {
     const params = new URLSearchParams();
@@ -109,6 +107,7 @@ function InstancesPageContent() {
         <PageHeader
           title="Instances"
           subtitle="Persisted in the database; active status comes from PM2 on the host. Click a row for details and logs."
+          action={<ReloadButton onReload={load} title="Reload instances" />}
         />
         <div className="card p-5">
           {error ? <div className="alert-error mb-4">{error}</div> : null}

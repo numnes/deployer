@@ -66,7 +66,7 @@ echo "[dev-up] Starting Postgres/Redis in Docker..."
 compose up -d postgres redis
 
 echo "[dev-up] Building web container (no cache)..."
-compose build --no-cache web
+compose build web
 compose up -d web
 
 echo "[dev-up] Waiting for Postgres to become healthy..."
@@ -136,6 +136,25 @@ echo ""
 api_code="$(wait_for_http "http://localhost:${API_PORT}/docs" "API" || true)"
 web_code="$(wait_for_http "http://localhost:${WEB_PUBLISH_PORT}/" "Web" || true)"
 echo "[dev-up] Health check: API /docs=${api_code}, Web=${web_code}"
+
+SETUP_KEY="$(grep -E '^DEPLOYER_SETUP_KEY=' "${ROOT_DIR}/api/.env" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
+if [[ -n "$SETUP_KEY" ]]; then
+  masked="${SETUP_KEY:0:6}…${SETUP_KEY: -4}"
+  echo ""
+  echo "[dev-up] Setup key (root-only) configured in api/.env: ${masked}"
+  echo "  Privileged endpoints (register / list users) require this key when the"
+  echo "  API is exposed. Send it in the header X-Deployer-Setup-Key. Examples:"
+  echo ""
+  echo "    KEY=\$(grep '^DEPLOYER_SETUP_KEY=' ${ROOT_DIR}/api/.env | cut -d= -f2-)"
+  echo "    # register a user"
+  echo "    curl -fsS -X POST http://localhost:${API_PORT}/auth/register \\"
+  echo "      -H \"Content-Type: application/json\" \\"
+  echo "      -H \"X-Deployer-Setup-Key: \$KEY\" \\"
+  echo "      -d '{\"email\":\"admin@example.com\",\"password\":\"change-me-123\"}'"
+  echo "    # list users"
+  echo "    curl -fsS http://localhost:${API_PORT}/users -H \"X-Deployer-Setup-Key: \$KEY\""
+  echo ""
+fi
 
 # shellcheck source=lib/github-credentials-hint.sh
 source "${ROOT_DIR}/scripts/lib/github-credentials-hint.sh"

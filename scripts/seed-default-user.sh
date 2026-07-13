@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prompts for email/password when needed and writes admin user to Postgres.
+# Prompts for email/password when needed and registers admin user via API.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -14,8 +14,15 @@ if ! docker ps --format '{{.Names}}' | grep -qx deployer-postgres; then
   exit 1
 fi
 
-if [[ ! -d "${ROOT_DIR}/api/node_modules/bcrypt" ]]; then
-  echo "[seed-user] Run pnpm/npm install in api/ before seeding." >&2
+if [[ -f "${ROOT_DIR}/api/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${ROOT_DIR}/api/.env"
+  set +a
+fi
+
+if [[ -z "${DEPLOYER_SETUP_KEY:-}" ]]; then
+  echo "[seed-user] DEPLOYER_SETUP_KEY missing in api/.env. Run deployer setup first." >&2
   exit 1
 fi
 
