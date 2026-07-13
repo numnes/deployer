@@ -1,6 +1,8 @@
 import { Controller, Delete, Get, Param, ParseUUIDPipe, Post, Body, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import type { ClusterKeyScope } from '../entities/cluster-key.entity';
 import { ClusterKeysService } from './cluster-keys.service';
 
@@ -11,7 +13,8 @@ class CreateClusterKeyDto {
 
 @ApiTags('cluster-keys')
 @ApiBearerAuth('jwt')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin')
 @Controller('cluster-keys')
 export class ClusterKeysController {
   constructor(private readonly keys: ClusterKeysService) {}

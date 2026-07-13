@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { login } from './::handlers/auth';
-import { setTokenClient } from '@/lib/client-auth';
+import { setTokenClient, setUserClient } from '@/lib/client-auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -33,6 +33,7 @@ export default function LoginPage() {
                 const password = String(fd.get('password') ?? '');
                 const data = await login(email, password);
                 setTokenClient(data.access_token);
+                setUserClient(data.user);
                 router.push('/');
               } catch {
                 setError('Could not sign in.');

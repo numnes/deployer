@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { ReloadButton } from "@/components/ReloadButton";
 import { NodeBadge } from "@/components/NodeBadge";
 import { RequireAuth } from "@/components/RequireAuth";
+import { getUserClient, isAdmin } from "@/lib/client-auth";
 import { ClientTable } from "@/components/ClientTable";
 import { parseProjectRegistrationJson } from "@/lib/project-registration-json";
 import { useRouter } from "next/navigation";
@@ -13,6 +14,7 @@ import { createProject, listProjects, type Project } from "./::handlers/projects
 
 export default function ProjectsPage() {
   const router = useRouter();
+  const [admin, setAdmin] = useState(() => isAdmin(getUserClient()));
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -36,6 +38,7 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     void load();
+    setAdmin(isAdmin(getUserClient()));
   }, [load]);
 
   async function submitProject(fields: {
@@ -90,22 +93,24 @@ export default function ProjectsPage() {
           action={
             <div className="flex items-center gap-2">
               <ReloadButton onReload={load} title="Reload projects" />
-              <button
-                type="button"
-                className="btn btn-success"
-                onClick={() => {
-                  setShowForm((v) => !v);
-                  setFormError(null);
-                  setImportError(null);
-                }}
-              >
-                {showForm ? "Cancel" : "Add project"}
-              </button>
+              {admin ? (
+                <button
+                  type="button"
+                  className="btn btn-success"
+                  onClick={() => {
+                    setShowForm((v) => !v);
+                    setFormError(null);
+                    setImportError(null);
+                  }}
+                >
+                  {showForm ? "Cancel" : "Add project"}
+                </button>
+              ) : null}
             </div>
           }
         />
 
-        {showForm ? (
+        {admin && showForm ? (
           <div className="card mb-5 space-y-6 p-5">
             <div>
               <h2 className="text-sm font-medium text-[#e8eaed]">
@@ -250,18 +255,18 @@ export default function ProjectsPage() {
             {(projects ?? []).map((p) => (
               <tr
                 key={`${p.nodeId}:${p.id}`}
-                role={p.isLocal ? 'button' : undefined}
-                tabIndex={p.isLocal ? 0 : undefined}
+                role={p.isLocal && admin ? 'button' : undefined}
+                tabIndex={p.isLocal && admin ? 0 : undefined}
                 className={
-                  p.isLocal
+                  p.isLocal && admin
                     ? 'cursor-pointer transition hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-sky-200/30'
                     : ''
                 }
                 onClick={() => {
-                  if (p.isLocal) router.push(`/projects/${p.id}/settings`);
+                  if (p.isLocal && admin) router.push(`/projects/${p.id}/settings`);
                 }}
                 onKeyDown={(e) => {
-                  if (!p.isLocal) return;
+                  if (!p.isLocal || !admin) return;
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     router.push(`/projects/${p.id}/settings`);

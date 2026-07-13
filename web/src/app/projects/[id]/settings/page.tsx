@@ -4,6 +4,7 @@ import { PageContainer } from '@/components/PageContainer';
 import { PageHeader } from '@/components/PageHeader';
 import { ReloadButton } from '@/components/ReloadButton';
 import { RequireAuth } from '@/components/RequireAuth';
+import { RequireRole } from '@/components/RequireRole';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -72,6 +73,7 @@ export default function ProjectSettingsPage() {
 
   return (
     <RequireAuth>
+      <RequireRole roles={['admin']}>
       <PageContainer>
         <div className="mb-3 text-sm text-[#b8bcc4]">
           <Link className="link-muted" href="/projects">
@@ -348,6 +350,7 @@ export default function ProjectSettingsPage() {
           ) : null}
         </div>
       </PageContainer>
+      </RequireRole>
     </RequireAuth>
   );
 }

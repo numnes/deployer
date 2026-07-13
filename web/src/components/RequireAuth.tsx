@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getTokenClient } from '@/lib/client-auth';
 import { AppShell } from './AppShell';
+import { AuthProvider } from './AuthProvider';
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -19,6 +20,10 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   if (!ready) return null;
-  return <AppShell>{children}</AppShell>;
+  return (
+    <AuthProvider>
+      <AppShell>{children}</AppShell>
+    </AuthProvider>
+  );
 }
 

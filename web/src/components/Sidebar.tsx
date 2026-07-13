@@ -9,7 +9,6 @@ import {
   IconDashboard,
   IconFolder,
   IconGithub,
-  IconKey,
   IconLayers,
   IconLock,
   IconLogout,
@@ -18,6 +17,8 @@ import {
   IconUsers,
 } from "./icons";
 import { clearTokenClient } from "@/lib/client-auth";
+import { useAuth } from "@/components/AuthProvider";
+import { isAdmin } from "@/lib/client-auth";
 
 const SIDEBAR_OPEN_KEY = "deployer-sidebar-open";
 
@@ -177,9 +178,10 @@ function NavGroup({ item, pathname }: { item: NavItem; pathname: string }) {
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useAuth();
 
-  const items = useMemo<NavItem[]>(
-    () => [
+  const items = useMemo<NavItem[]>(() => {
+    const base: NavItem[] = [
       {
         href: "/",
         label: "Dashboard",
@@ -193,36 +195,40 @@ export function Sidebar() {
           { href: "/instances", label: "Instances", icon: <IconLayers /> },
         ],
       },
-      {
-        href: "/users",
-        label: "Users",
-        icon: <IconUsers />,
-        children: [
-          { href: "/me/api-keys", label: "API keys", icon: <IconKey /> },
-        ],
-      },
-      {
-        href: "/settings",
-        label: "Settings",
-        icon: <IconSettings />,
-      },
-      {
-        href: "",
-        label: "Setup",
-        icon: <IconBook />,
-        children: [
-          {
-            href: "/setup/github-actions",
-            label: "GitHub Actions",
-            icon: <IconGithub />,
-          },
-          { href: "/setup/secrets", label: "Secrets", icon: <IconLock /> },
-          { href: "/setup/nginx", label: "Nginx", icon: <IconServer /> },
-        ],
-      },
-    ],
-    [],
-  );
+    ];
+
+    if (isAdmin(user)) {
+      base.push(
+        {
+          href: "/users",
+          label: "Users",
+          icon: <IconUsers />,
+        },
+        {
+          href: "/settings",
+          label: "Settings",
+          icon: <IconSettings />,
+        },
+      );
+    }
+
+    base.push({
+      href: "",
+      label: "Setup",
+      icon: <IconBook />,
+      children: [
+        {
+          href: "/setup/github-actions",
+          label: "GitHub Actions",
+          icon: <IconGithub />,
+        },
+        { href: "/setup/secrets", label: "Secrets", icon: <IconLock /> },
+        { href: "/setup/nginx", label: "Nginx", icon: <IconServer /> },
+      ],
+    });
+
+    return base;
+  }, [user]);
 
   return (
     <aside className="flex h-[100wh] w-56 shrink-0 flex-col border-r border-[#3d4048] bg-[#1f2124]">

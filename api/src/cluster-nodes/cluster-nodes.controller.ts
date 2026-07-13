@@ -10,6 +10,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { ClusterAggregatorService } from '../cluster/cluster-aggregator.service';
 import {
   ClusterNodesService,
@@ -18,7 +20,8 @@ import {
 
 @ApiTags('cluster-nodes')
 @ApiBearerAuth('jwt')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin')
 @Controller('cluster-nodes')
 export class ClusterNodesController {
   constructor(

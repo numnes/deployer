@@ -11,6 +11,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { ClusterAggregatorService } from '../cluster/cluster-aggregator.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
@@ -27,7 +29,8 @@ export class ProjectsController {
   @ApiBearerAuth('jwt')
   @ApiBody({ type: CreateProjectDto })
   @ApiOkResponse({ description: 'Projeto criado' })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post()
   create(@Body() dto: CreateProjectDto) {
     return this.projects.create(dto);
@@ -52,7 +55,8 @@ export class ProjectsController {
   @ApiBearerAuth('jwt')
   @ApiBody({ type: UpdateProjectDto })
   @ApiOkResponse({ description: 'Projeto atualizado' })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -63,7 +67,8 @@ export class ProjectsController {
 
   @ApiBearerAuth('jwt')
   @ApiOkResponse({ description: 'Pausa todas as instâncias ativas do projeto' })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post(':id/instances/teardown')
   teardownInstances(@Param('id', ParseUUIDPipe) id: string) {
     return this.projects.teardownAllInstances(id);
@@ -71,7 +76,8 @@ export class ProjectsController {
 
   @ApiBearerAuth('jwt')
   @ApiOkResponse({ description: 'Reinicia / redeploy de todas as instâncias do projeto' })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Post(':id/instances/restart')
   restartInstances(@Param('id', ParseUUIDPipe) id: string) {
     return this.projects.restartAllInstances(id);
@@ -79,7 +85,8 @@ export class ProjectsController {
 
   @ApiBearerAuth('jwt')
   @ApiOkResponse({ description: 'Remove projeto e todas as instâncias' })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Delete(':id')
   delete(@Param('id', ParseUUIDPipe) id: string) {
     return this.projects.deleteProject(id);

@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { MAX_ACTIVE_INSTANCES_KEY, SettingsService } from './settings.service';
 
 @ApiTags('settings')
@@ -10,7 +12,8 @@ export class SettingsController {
 
   @ApiBearerAuth('jwt')
   @ApiOkResponse({ description: 'Configurações da ferramenta' })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Get()
   async getAll() {
     const raw = await this.settings.getAll();
@@ -26,7 +29,8 @@ export class SettingsController {
 
   @ApiBearerAuth('jwt')
   @ApiOkResponse({ description: 'Atualiza configurações' })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Patch()
   async patch(@Body() body: { maxActiveInstances?: number; nodeLabel?: string }) {
     if (body.maxActiveInstances != null) {
