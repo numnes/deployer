@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ClusterAggregatorService } from '../cluster/cluster-aggregator.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { ProjectsService } from './projects.service';
@@ -18,7 +19,10 @@ import { ProjectsService } from './projects.service';
 @ApiTags('projects')
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projects: ProjectsService) {}
+  constructor(
+    private readonly projects: ProjectsService,
+    private readonly cluster: ClusterAggregatorService,
+  ) {}
 
   @ApiBearerAuth('jwt')
   @ApiBody({ type: CreateProjectDto })
@@ -30,11 +34,11 @@ export class ProjectsController {
   }
 
   @ApiBearerAuth('jwt')
-  @ApiOkResponse({ description: 'Lista de projetos' })
+  @ApiOkResponse({ description: 'Lista de projetos (local + nós cluster)' })
   @UseGuards(JwtAuthGuard)
   @Get()
   list() {
-    return this.projects.findAll();
+    return this.cluster.aggregateProjects();
   }
 
   @ApiBearerAuth('jwt')

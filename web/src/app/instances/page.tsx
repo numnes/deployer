@@ -3,6 +3,7 @@
 import { PageContainer } from '@/components/PageContainer';
 import { PageHeader } from '@/components/PageHeader';
 import { ReloadButton } from '@/components/ReloadButton';
+import { NodeBadge } from '@/components/NodeBadge';
 import { RequireAuth } from '@/components/RequireAuth';
 import { ClientTable } from '@/components/ClientTable';
 import Link from 'next/link';
@@ -180,6 +181,9 @@ function InstancesPageContent() {
                   Project
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
+                  Node
+                </th>
+                <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
                   Branch
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
@@ -234,6 +238,9 @@ function InstancesPageContent() {
               >
                 <td className="border-b border-white/10 px-3 py-2 font-semibold">
                   {i.projectSlug}
+                </td>
+                <td className="border-b border-white/10 px-3 py-2">
+                  <NodeBadge node={i} />
                 </td>
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
                   {i.branch}
@@ -307,7 +314,7 @@ function InstancesPageContent() {
             ))}
             {instances && filtered && filtered.length === 0 ? (
               <tr>
-                <td colSpan={12} className="px-3 py-3 text-white/70">
+                <td colSpan={13} className="px-3 py-3 text-white/70">
                   {hasFilters
                     ? 'No instances match the current filters.'
                     : 'No instances yet (they appear here after a successful deploy).'}
@@ -316,7 +323,7 @@ function InstancesPageContent() {
             ) : null}
             {!instances && !error ? (
               <tr>
-                <td colSpan={12} className="px-3 py-3 text-white/70">
+                <td colSpan={13} className="px-3 py-3 text-white/70">
                   Loading…
                 </td>
               </tr>

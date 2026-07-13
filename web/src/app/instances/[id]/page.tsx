@@ -3,6 +3,7 @@
 import { PageContainer } from '@/components/PageContainer';
 import { PageHeader } from '@/components/PageHeader';
 import { ReloadButton } from '@/components/ReloadButton';
+import { NodeBadge } from '@/components/NodeBadge';
 import { RequireAuth } from '@/components/RequireAuth';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -75,7 +76,8 @@ export default function InstanceDetailPage() {
   }, [row, loadLogs]);
 
   const reloadAll = useCallback(async () => {
-    await Promise.all([loadDetail(), loadLogs()]);
+    await loadDetail();
+    await loadLogs();
   }, [loadDetail, loadLogs]);
 
   return (
@@ -97,13 +99,38 @@ export default function InstanceDetailPage() {
               title="Instance"
               subtitle={
                 <>
-                  Project <span className="font-semibold text-[#e8eaed]">{row.projectSlug}</span>
-                  {' · '}
-                  branch <span className="font-mono text-[#e8eaed]">{row.branch}</span>
+                  <NodeBadge node={row} />
+                  <span className="ml-2">
+                    Project <span className="font-semibold text-[#e8eaed]">{row.projectSlug}</span>
+                    {' · '}
+                    branch <span className="font-mono text-[#e8eaed]">{row.branch}</span>
+                  </span>
                 </>
               }
               action={<ReloadButton onReload={reloadAll} title="Reload instance" />}
             />
+
+            {!row.isLocal ? (
+              <div
+                className={`rounded-xl border px-4 py-3 text-sm ${
+                  row.canWrite
+                    ? 'border-emerald-400/25 bg-emerald-950/30 text-emerald-100/85'
+                    : 'border-violet-400/25 bg-violet-950/30 text-violet-100/85'
+                }`}
+              >
+                {row.canWrite ? (
+                  <>
+                    Managing instance on remote node <strong>{row.nodeLabel}</strong>. This key has
+                    read &amp; write access — actions run on that machine.
+                  </>
+                ) : (
+                  <>
+                    Read-only view from remote node <strong>{row.nodeLabel}</strong>. The cluster
+                    key for this node does not allow write actions.
+                  </>
+                )}
+              </div>
+            ) : null}
 
             {row.status === 'error' && row.lastDeployError ? (
               <div className="rounded-xl border border-rose-400/30 bg-rose-950/40 p-4">
@@ -123,7 +150,7 @@ export default function InstanceDetailPage() {
                 <button
                   type="button"
                   className="btn btn-primary text-sm"
-                  disabled={actionLoading || row.status !== 'active'}
+                  disabled={actionLoading || row.status !== 'active' || !row.canWrite}
                   title={row.status !== 'active' ? 'Only active instances can be paused' : undefined}
                   onClick={async () => {
                     setActionMsg(null);
@@ -147,6 +174,7 @@ export default function InstanceDetailPage() {
                   className="btn text-sm"
                   disabled={
                     actionLoading ||
+                    !row.canWrite ||
                     !['waiting', 'paused', 'error', 'active'].includes(row.status)
                   }
                   onClick={async () => {
@@ -173,7 +201,7 @@ export default function InstanceDetailPage() {
                 <button
                   type="button"
                   className="btn text-sm border-rose-200/30 bg-rose-200/10 text-rose-100 hover:bg-rose-200/15"
-                  disabled={actionLoading}
+                  disabled={actionLoading || !row.canWrite}
                   onClick={async () => {
                     if (
                       !confirm(
@@ -341,6 +369,11 @@ export default function InstanceDetailPage() {
                   <p className="mt-0.5 text-xs text-white/55">
                     Last lines from {row.runner === 'docker' ? 'container' : 'process'}{' '}
                     <span className="font-mono">{row.runtimeName ?? row.pm2Name}</span>
+                    {!row.isLocal ? (
+                      <span className="ml-1 text-white/40">
+                        (proxied from {row.nodeLabel})
+                      </span>
+                    ) : null}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

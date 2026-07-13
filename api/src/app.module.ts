@@ -5,9 +5,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { AuthModule } from './auth/auth.module';
+import { ClusterKeysModule } from './cluster-keys/cluster-keys.module';
+import { ClusterNodesModule } from './cluster-nodes/cluster-nodes.module';
+import { ClusterModule } from './cluster/cluster.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { DeployModule } from './deploy/deploy.module';
 import { ApiKey } from './entities/api-key.entity';
+import { ClusterKey } from './entities/cluster-key.entity';
+import { ClusterNode } from './entities/cluster-node.entity';
 import { PreviewInstanceStatusEvent } from './entities/preview-instance-status-event.entity';
 import { PreviewInstance } from './entities/preview-instance.entity';
 import { Project } from './entities/project.entity';
@@ -39,6 +44,8 @@ import { UsersModule } from './users/users.module';
         entities: [
           User,
           ApiKey,
+          ClusterKey,
+          ClusterNode,
           Project,
           PreviewInstance,
           PreviewInstanceStatusEvent,
@@ -61,6 +68,9 @@ import { UsersModule } from './users/users.module';
     }),
     AuthModule,
     ApiKeysModule,
+    ClusterKeysModule,
+    ClusterNodesModule,
+    ClusterModule,
     ProjectsModule,
     SettingsModule,
     DeployModule,

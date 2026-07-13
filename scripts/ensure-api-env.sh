@@ -76,6 +76,14 @@ if [[ -z "$setup_key" ]]; then
   setup_key="$(generate_jwt_secret)"
 fi
 
+# Chave local usada para criptografar credenciais de nós remotos no Postgres.
+# Deve permanecer estável entre restarts; se trocar, nós conectados antigos
+# precisam ser recadastrados.
+cluster_secret="$(get_env_var DEPLOYER_CLUSTER_SECRET || true)"
+if [[ -z "$cluster_secret" ]]; then
+  cluster_secret="$(generate_jwt_secret)"
+fi
+
 work_root="${HOME}/.local/share/deployer"
 core_dir="${ROOT_DIR}/core"
 
@@ -88,6 +96,7 @@ set_env_var REDIS_PORT "$REDIS_PORT"
 set_env_var DEPLOYER_WORK_ROOT "$work_root"
 set_env_var DEPLOYER_CORE_DIR "$core_dir"
 set_env_var DEPLOYER_SETUP_KEY "$setup_key"
+set_env_var DEPLOYER_CLUSTER_SECRET "$cluster_secret"
 set_env_var CORS_ORIGIN "http://localhost:${WEB_PORT}"
 
 echo "[ensure-env] api/.env updated (API :${API_PORT}, Postgres :${POSTGRES_PORT}, Redis :${REDIS_PORT}, Web :${WEB_PORT})"

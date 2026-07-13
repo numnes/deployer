@@ -2,6 +2,8 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
+import { ClusterAggregatorService } from '../cluster/cluster-aggregator.service';
+import { parseRemoteId } from '../cluster/cluster.types';
 import {
   PreviewInstancesService,
   type InstanceListItem,
@@ -16,27 +18,54 @@ export class InstancesService {
   constructor(
     private readonly config: ConfigService,
     private readonly previewInstances: PreviewInstancesService,
+    private readonly cluster: ClusterAggregatorService,
   ) {}
 
-  async listForApi(): Promise<InstanceListItem[]> {
+  async listLocalForApi(): Promise<InstanceListItem[]> {
     const maps = await this.previewInstances.fetchRuntimeMaps();
     return this.previewInstances.findAllForApi(maps);
   }
 
-  async getOneForApi(id: string): Promise<InstanceListItem> {
+  async getLocalOneForApi(id: string): Promise<InstanceListItem> {
     const maps = await this.previewInstances.fetchRuntimeMaps();
     return this.previewInstances.findOneForApi(id, maps);
   }
 
+  async listForApi() {
+    return this.cluster.aggregateInstances();
+  }
+
+  async getOneForApi(id: string) {
+    const remote = parseRemoteId(id);
+    if (remote) {
+      return this.cluster.getRemoteInstance(remote.nodeId, remote.remoteId);
+    }
+    const maps = await this.previewInstances.fetchRuntimeMaps();
+    const row = await this.previewInstances.findOneForApi(id, maps);
+    return this.cluster.tagLocal(row);
+  }
+
   async pause(id: string): Promise<InstanceListItem> {
+    const remote = parseRemoteId(id);
+    if (remote) {
+      return this.cluster.pauseRemoteInstance(remote.nodeId, remote.remoteId);
+    }
     return this.previewInstances.pauseInstance(id);
   }
 
   async activate(id: string): Promise<InstanceListItem> {
+    const remote = parseRemoteId(id);
+    if (remote) {
+      return this.cluster.activateRemoteInstance(remote.nodeId, remote.remoteId);
+    }
     return this.previewInstances.activateOrRedeployInstance(id);
   }
 
   async remove(id: string): Promise<{ ok: true }> {
+    const remote = parseRemoteId(id);
+    if (remote) {
+      return this.cluster.removeRemoteInstance(remote.nodeId, remote.remoteId);
+    }
     await this.previewInstances.destroyInstanceById(id);
     return { ok: true };
   }
@@ -46,6 +75,14 @@ export class InstancesService {
     lines: number;
     output: string;
   }> {
+    const remote = parseRemoteId(id);
+    if (remote) {
+      return this.cluster.remoteInstanceLogs(
+        remote.nodeId,
+        remote.remoteId,
+        lines,
+      );
+    }
     const row = await this.previewInstances.findEntityById(id);
     if (!row) {
       throw new NotFoundException(`Instância "${id}" não encontrada`);

@@ -1,6 +1,8 @@
 import { apiBaseClient, httpJson } from '@/lib/http';
 import { getTokenClient } from '@/lib/client-auth';
 
+import type { NodeRef } from '@/lib/node-ref';
+
 export type InstanceRow = {
   id: string;
   projectId: string;
@@ -29,7 +31,7 @@ export type InstanceRow = {
   hasExistenceLifetimeLimit: boolean;
   createdAt: string;
   updatedAt: string;
-};
+} & NodeRef;
 
 export function runnerLabel(runner: string | undefined): string {
   return runner === 'docker' ? 'Docker' : 'PM2';

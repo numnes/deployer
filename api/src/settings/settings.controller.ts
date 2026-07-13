@@ -15,10 +15,12 @@ export class SettingsController {
   async getAll() {
     const raw = await this.settings.getAll();
     const maxActiveInstances = await this.settings.getMaxActiveInstances();
+    const nodeLabel = await this.settings.getNodeLabel();
     return {
       ...raw,
       [MAX_ACTIVE_INSTANCES_KEY]: String(maxActiveInstances),
       maxActiveInstancesParsed: maxActiveInstances,
+      nodeLabel,
     };
   }
 
@@ -26,9 +28,12 @@ export class SettingsController {
   @ApiOkResponse({ description: 'Atualiza configurações' })
   @UseGuards(JwtAuthGuard)
   @Patch()
-  async patch(@Body() body: { maxActiveInstances?: number }) {
+  async patch(@Body() body: { maxActiveInstances?: number; nodeLabel?: string }) {
     if (body.maxActiveInstances != null) {
       await this.settings.setMaxActiveInstances(body.maxActiveInstances);
+    }
+    if (body.nodeLabel !== undefined) {
+      await this.settings.setNodeLabel(body.nodeLabel);
     }
     return this.getAll();
   }

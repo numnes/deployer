@@ -3,6 +3,7 @@
 import { PageContainer } from "@/components/PageContainer";
 import { PageHeader } from "@/components/PageHeader";
 import { ReloadButton } from "@/components/ReloadButton";
+import { NodeBadge } from "@/components/NodeBadge";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ClientTable } from "@/components/ClientTable";
 import { parseProjectRegistrationJson } from "@/lib/project-registration-json";
@@ -232,6 +233,9 @@ export default function ProjectsPage() {
                   Slug
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
+                  Node
+                </th>
+                <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
                   Git URL
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
@@ -245,12 +249,19 @@ export default function ProjectsPage() {
           >
             {(projects ?? []).map((p) => (
               <tr
-                key={p.id}
-                role="button"
-                tabIndex={0}
-                className="cursor-pointer transition hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-sky-200/30"
-                onClick={() => router.push(`/projects/${p.id}/settings`)}
+                key={`${p.nodeId}:${p.id}`}
+                role={p.isLocal ? 'button' : undefined}
+                tabIndex={p.isLocal ? 0 : undefined}
+                className={
+                  p.isLocal
+                    ? 'cursor-pointer transition hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-sky-200/30'
+                    : ''
+                }
+                onClick={() => {
+                  if (p.isLocal) router.push(`/projects/${p.id}/settings`);
+                }}
                 onKeyDown={(e) => {
+                  if (!p.isLocal) return;
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     router.push(`/projects/${p.id}/settings`);
@@ -259,6 +270,9 @@ export default function ProjectsPage() {
               >
                 <td className="border-b border-white/10 px-3 py-2 font-semibold">
                   {p.slug}
+                </td>
+                <td className="border-b border-white/10 px-3 py-2">
+                  <NodeBadge node={p} />
                 </td>
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
                   {p.gitUrl}
@@ -277,7 +291,7 @@ export default function ProjectsPage() {
             ))}
             {projects && projects.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-3 py-3 text-white/70">
+                <td colSpan={5} className="px-3 py-3 text-white/70">
                   No projects yet. Click Add project or run deployer project init in your app
                   repo.
                 </td>
@@ -285,7 +299,7 @@ export default function ProjectsPage() {
             ) : null}
             {!projects && !error ? (
               <tr>
-                <td colSpan={4} className="px-3 py-3 text-white/70">
+                <td colSpan={5} className="px-3 py-3 text-white/70">
                   Loading…
                 </td>
               </tr>

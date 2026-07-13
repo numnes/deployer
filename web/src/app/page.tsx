@@ -3,6 +3,7 @@
 import { PageContainer } from '@/components/PageContainer';
 import { PageHeader } from '@/components/PageHeader';
 import { ReloadButton } from '@/components/ReloadButton';
+import { NodeBadge } from '@/components/NodeBadge';
 import { RequireAuth } from '@/components/RequireAuth';
 import {
   IconCpu,
@@ -24,7 +25,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
-import { fetchDashboardSummary, type DashboardSummary } from './::handlers/dashboard';
+import { fetchDashboardSummary, type DashboardSummary, type HostStats } from './::handlers/dashboard';
 
 const STATUS_ORDER = ['waiting', 'deploying', 'active', 'paused', 'error'] as const;
 
@@ -111,6 +112,65 @@ function cpuLoadPct(loadavg1: number, cores: number): number {
   return Math.min(100, Math.round((loadavg1 / cores) * 100));
 }
 
+function HostResourcesBlock({
+  nodeLabel,
+  isLocal,
+  online,
+  host,
+}: {
+  nodeLabel: string;
+  isLocal: boolean;
+  online?: boolean;
+  host: HostStats;
+}) {
+  const cpuPct = cpuLoadPct(host.cpu.loadavg1, host.cpu.cores);
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/10 p-4">
+      <div className="mb-3">
+        <NodeBadge node={{ nodeLabel, isLocal, online }} />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+          <div className="flex items-center gap-2 text-xs text-white/55">
+            <IconCpu className="h-4 w-4 text-sky-400/80" />
+            CPU (loadavg)
+          </div>
+          <div className={`mt-2 text-lg font-semibold ${usageTextColor(cpuPct)}`}>
+            {`${host.cpu.loadavg1.toFixed(2)} / ${host.cpu.loadavg5.toFixed(2)} / ${host.cpu.loadavg15.toFixed(2)}`}
+          </div>
+          <div className="mt-1 text-xs text-white/55">
+            {`${host.cpu.cores} cores · ~${cpuPct}% load (1m)`}
+          </div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+          <div className="flex items-center gap-2 text-xs text-white/55">
+            <IconMemory className="h-4 w-4 text-violet-400/80" />
+            Memory
+          </div>
+          <div className={`mt-2 text-lg font-semibold ${usageTextColor(host.memory.usedPct)}`}>
+            {`${host.memory.usedPct}%`}
+          </div>
+          <div className="mt-1 text-xs text-white/55">
+            {`${formatBytes(host.memory.usedBytes)} / ${formatBytes(host.memory.totalBytes)}`}
+          </div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+          <div className="flex items-center gap-2 text-xs text-white/55">
+            <IconDisk className="h-4 w-4 text-amber-400/80" />
+            Disk ({host.disk.path})
+          </div>
+          <div className={`mt-2 text-lg font-semibold ${usageTextColor(host.disk.usedPct)}`}>
+            {`${host.disk.usedPct}%`}
+          </div>
+          <div className="mt-1 text-xs text-white/55">
+            {`${formatBytes(host.disk.usedBytes)} / ${formatBytes(host.disk.totalBytes)}`}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -129,8 +189,7 @@ export default function HomePage() {
     void load();
   }, [load]);
 
-  const cpuPct =
-    data != null ? cpuLoadPct(data.host.cpu.loadavg1, data.host.cpu.cores) : null;
+  const hosts = data?.hosts ?? [];
 
   const activeCount = data?.instancesByStatus.active ?? 0;
   const maxSlots = data?.maxActiveInstances ?? 0;
@@ -150,7 +209,7 @@ export default function HomePage() {
       <PageContainer>
         <PageHeader
           title="Dashboard"
-          subtitle="Host resources and preview instance activity."
+          subtitle="Host resources and preview activity across connected machines."
           action={<ReloadButton onReload={load} title="Reload dashboard" />}
         />
         {err ? <div className="alert-error mb-4">{err}</div> : null}
@@ -158,71 +217,22 @@ export default function HomePage() {
           <div className="card p-5 lg:col-span-2">
             <h2 className="text-base font-semibold text-[#e8eaed]">Server resources</h2>
             <p className="mt-1 text-sm text-[#8b919a]">
-              CPU, memory, and disk on the machine running the API.
+              CPU, memory, and disk per connected deployer node.
             </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                <div className="flex items-center gap-2 text-xs text-white/55">
-                  <IconCpu className="h-4 w-4 text-sky-400/80" />
-                  CPU (loadavg)
-                </div>
-                <div
-                  className={`mt-2 text-lg font-semibold ${
-                    cpuPct != null ? usageTextColor(cpuPct) : 'text-white/90'
-                  }`}
-                >
-                  {data
-                    ? `${data.host.cpu.loadavg1.toFixed(2)} / ${data.host.cpu.loadavg5.toFixed(
-                        2,
-                      )} / ${data.host.cpu.loadavg15.toFixed(2)}`
-                    : '—'}
-                </div>
-                <div className="mt-1 text-xs text-white/55">
-                  {data
-                    ? `${data.host.cpu.cores} cores · ~${cpuPct}% load (1m)`
-                    : ''}
-                </div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                <div className="flex items-center gap-2 text-xs text-white/55">
-                  <IconMemory className="h-4 w-4 text-violet-400/80" />
-                  Memory
-                </div>
-                <div
-                  className={`mt-2 text-lg font-semibold ${
-                    data != null ? usageTextColor(data.host.memory.usedPct) : 'text-white/90'
-                  }`}
-                >
-                  {data ? `${data.host.memory.usedPct}%` : '—'}
-                </div>
-                <div className="mt-1 text-xs text-white/55">
-                  {data
-                    ? `${formatBytes(data.host.memory.usedBytes)} / ${formatBytes(
-                        data.host.memory.totalBytes,
-                      )}`
-                    : ''}
-                </div>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                <div className="flex items-center gap-2 text-xs text-white/55">
-                  <IconDisk className="h-4 w-4 text-amber-400/80" />
-                  Disk ({data?.host.disk.path ?? '—'})
-                </div>
-                <div
-                  className={`mt-2 text-lg font-semibold ${
-                    data != null ? usageTextColor(data.host.disk.usedPct) : 'text-white/90'
-                  }`}
-                >
-                  {data ? `${data.host.disk.usedPct}%` : '—'}
-                </div>
-                <div className="mt-1 text-xs text-white/55">
-                  {data
-                    ? `${formatBytes(data.host.disk.usedBytes)} / ${formatBytes(
-                        data.host.disk.totalBytes,
-                      )}`
-                    : ''}
-                </div>
-              </div>
+            <div className="mt-4 space-y-4">
+              {hosts.length > 0 ? (
+                hosts.map((h) => (
+                  <HostResourcesBlock
+                    key={h.nodeId}
+                    nodeLabel={h.nodeLabel}
+                    isLocal={h.isLocal}
+                    online={h.online}
+                    host={h.host}
+                  />
+                ))
+              ) : (
+                <p className="text-sm text-white/55">Loading…</p>
+              )}
             </div>
           </div>
 
@@ -329,10 +339,13 @@ export default function HomePage() {
             <ul className="mt-4 space-y-2 text-sm">
               {(data?.recentProjects ?? []).map((p) => (
                 <li
-                  key={p.slug}
+                  key={`${p.nodeId}:${p.slug}`}
                   className="flex justify-between gap-3 border-b border-white/10 pb-2 last:border-0"
                 >
-                  <span className="font-medium text-white/90">{p.slug}</span>
+                  <span className="font-medium text-white/90">
+                    {p.slug}{' '}
+                    <span className="text-xs font-normal text-white/45">({p.nodeLabel})</span>
+                  </span>
                   <span className="text-white/55">
                     {new Date(p.lastActivityAt).toLocaleString('en-US')}
                   </span>
@@ -354,6 +367,9 @@ export default function HomePage() {
                       When
                     </th>
                     <th className="border-b border-white/10 px-2 py-2 text-left text-white/75">
+                      Node
+                    </th>
+                    <th className="border-b border-white/10 px-2 py-2 text-left text-white/75">
                       Project
                     </th>
                     <th className="border-b border-white/10 px-2 py-2 text-left text-white/75">
@@ -370,6 +386,9 @@ export default function HomePage() {
                       <td className="border-b border-white/10 px-2 py-2 text-white/65">
                         {new Date(e.at).toLocaleString('en-US')}
                       </td>
+                      <td className="border-b border-white/10 px-2 py-2 text-white/70">
+                        {e.nodeLabel}
+                      </td>
                       <td className="border-b border-white/10 px-2 py-2 font-medium text-white/90">
                         {e.projectSlug}
                       </td>
@@ -383,7 +402,7 @@ export default function HomePage() {
                   ))}
                   {data && data.recentStatusChanges.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="py-3 text-white/50">
+                      <td colSpan={5} className="py-3 text-white/50">
                         No events yet.
                       </td>
                     </tr>

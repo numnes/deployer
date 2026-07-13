@@ -35,6 +35,7 @@ async function bootstrap() {
       'Authorization',
       'X-Deployer-Api-Key',
       'X-Deployer-Setup-Key',
+      'X-Deployer-Cluster-Key',
       'X-Requested-With',
     ],
     maxAge: 86400,
@@ -78,6 +79,15 @@ async function bootstrap() {
           'Chave gerada na máquina root (DEPLOYER_SETUP_KEY) para bootstrap de usuários',
       },
       'setup-key',
+    )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        in: 'header',
+        name: 'x-deployer-cluster-key',
+        description: 'Chave cluster (clu_…) para leitura remota entre nós',
+      },
+      'cluster-key',
     )
     .build();
 

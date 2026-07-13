@@ -4,7 +4,6 @@ import {
   Get,
   Param,
   ParseIntPipe,
-  ParseUUIDPipe,
   Post,
   Query,
   UseGuards,
@@ -19,7 +18,7 @@ export class InstancesController {
   constructor(private readonly instances: InstancesService) {}
 
   @ApiBearerAuth('jwt')
-  @ApiOkResponse({ description: 'Lista de instâncias' })
+  @ApiOkResponse({ description: 'Lista de instâncias (local + nós cluster)' })
   @UseGuards(JwtAuthGuard)
   @Get()
   list() {
@@ -31,7 +30,7 @@ export class InstancesController {
   @UseGuards(JwtAuthGuard)
   @Get(':id/logs')
   logs(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id') id: string,
     @Query('lines', new DefaultValuePipe(200), ParseIntPipe) lines: number,
   ) {
     return this.instances.logsForInstance(id, lines);
@@ -41,7 +40,7 @@ export class InstancesController {
   @ApiOkResponse({ description: 'Pausa instância (derruba PM2/nginx, mantém registro)' })
   @UseGuards(JwtAuthGuard)
   @Post(':id/pause')
-  pause(@Param('id', ParseUUIDPipe) id: string) {
+  pause(@Param('id') id: string) {
     return this.instances.pause(id);
   }
 
@@ -49,7 +48,7 @@ export class InstancesController {
   @ApiOkResponse({ description: 'Ativa, despausa ou redeploy da instância' })
   @UseGuards(JwtAuthGuard)
   @Post(':id/activate')
-  activate(@Param('id', ParseUUIDPipe) id: string) {
+  activate(@Param('id') id: string) {
     return this.instances.activate(id);
   }
 
@@ -57,7 +56,7 @@ export class InstancesController {
   @ApiOkResponse({ description: 'Remove instância (destroy + remove do banco)' })
   @UseGuards(JwtAuthGuard)
   @Post(':id/remove')
-  remove(@Param('id', ParseUUIDPipe) id: string) {
+  remove(@Param('id') id: string) {
     return this.instances.remove(id);
   }
 
@@ -65,7 +64,7 @@ export class InstancesController {
   @ApiOkResponse({ description: 'Detalhe de uma instância' })
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  getOne(@Param('id', ParseUUIDPipe) id: string) {
+  getOne(@Param('id') id: string) {
     return this.instances.getOneForApi(id);
   }
 }

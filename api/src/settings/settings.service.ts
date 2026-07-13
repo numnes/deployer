@@ -1,19 +1,24 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+import os from 'os';
 import { Repository } from 'typeorm';
 import { Setting } from '../entities/setting.entity';
 
 export const MAX_ACTIVE_INSTANCES_KEY = 'max_active_instances';
+export const NODE_LABEL_KEY = 'node_label';
 
 @Injectable()
 export class SettingsService implements OnModuleInit {
   constructor(
     @InjectRepository(Setting)
     private readonly repo: Repository<Setting>,
+    private readonly config: ConfigService,
   ) {}
 
   async onModuleInit() {
     await this.ensureKey(MAX_ACTIVE_INSTANCES_KEY, '10');
+    await this.ensureKey(NODE_LABEL_KEY, '');
   }
 
   private async ensureKey(key: string, defaultValue: string) {
@@ -48,6 +53,20 @@ export class SettingsService implements OnModuleInit {
     const clamped = Math.max(1, Math.min(Math.floor(n), 1000));
     await this.setValue(MAX_ACTIVE_INSTANCES_KEY, String(clamped));
     return clamped;
+  }
+
+  async setNodeLabel(label: string | null | undefined) {
+    if (label === undefined) return;
+    const trimmed = label?.trim() ?? '';
+    await this.setValue(NODE_LABEL_KEY, trimmed);
+  }
+
+  async getNodeLabel(): Promise<string> {
+    const fromSettings = (await this.getValue(NODE_LABEL_KEY))?.trim();
+    if (fromSettings) return fromSettings;
+    const fromEnv = this.config.get<string>('DEPLOYER_NODE_LABEL')?.trim();
+    if (fromEnv) return fromEnv;
+    return os.hostname();
   }
 
   async getAll(): Promise<Record<string, string>> {

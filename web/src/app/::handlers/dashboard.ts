@@ -1,15 +1,25 @@
 import { apiBaseClient, httpJson } from '@/lib/http';
 import { getTokenClient } from '@/lib/client-auth';
+import type { NodeRef } from '@/lib/node-ref';
+
+export type HostStats = {
+  cpu: { cores: number; loadavg1: number; loadavg5: number; loadavg15: number };
+  memory: { totalBytes: number; freeBytes: number; usedBytes: number; usedPct: number };
+  disk: { path: string; totalBytes: number; freeBytes: number; usedBytes: number; usedPct: number };
+};
 
 export type DashboardSummary = {
   maxActiveInstances: number;
   instancesByStatus: Record<string, number>;
-  recentProjects: { slug: string; lastActivityAt: string }[];
-  host: {
-    cpu: { cores: number; loadavg1: number; loadavg5: number; loadavg15: number };
-    memory: { totalBytes: number; freeBytes: number; usedBytes: number; usedPct: number };
-    disk: { path: string; totalBytes: number; freeBytes: number; usedBytes: number; usedPct: number };
-  };
+  recentProjects: {
+    slug: string;
+    lastActivityAt: string;
+    nodeId: string;
+    nodeLabel: string;
+  }[];
+  host: HostStats;
+  hosts: Array<NodeRef & { host: HostStats }>;
+  nodes: NodeRef[];
   recentStatusChanges: {
     at: string;
     instanceId: string;
@@ -17,6 +27,8 @@ export type DashboardSummary = {
     branch: string;
     from: string | null;
     to: string;
+    nodeId: string;
+    nodeLabel: string;
   }[];
 };
 

@@ -5,10 +5,12 @@ import { PageHeader } from '@/components/PageHeader';
 import { RequireAuth } from '@/components/RequireAuth';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { ClusterSettingsSection } from './ClusterSettingsSection';
 import { fetchSettings, patchSettings } from './::handlers/settings';
 
 export default function SettingsPage() {
   const [max, setMax] = useState<number>(10);
+  const [nodeLabel, setNodeLabel] = useState('');
   const [raw, setRaw] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -23,6 +25,9 @@ export default function SettingsPage() {
         setRaw(s as Record<string, unknown>);
         if (typeof s.maxActiveInstancesParsed === 'number') {
           setMax(s.maxActiveInstancesParsed);
+        }
+        if (typeof s.nodeLabel === 'string') {
+          setNodeLabel(s.nodeLabel);
         }
       } finally {
         if (alive) setLoading(false);
@@ -43,15 +48,10 @@ export default function SettingsPage() {
         </div>
         <PageHeader
           title="Settings"
-          subtitle={
-            <>
-              Global limit for instances in <span className="font-semibold text-[#e8eaed]">active</span>{' '}
-              state (running on PM2). Additional deploys are queued as{' '}
-              <span className="font-semibold text-[#e8eaed]">waiting</span>.
-            </>
-          }
+          subtitle="Global limits, this node identity, and multi-machine cluster connections."
         />
-        <div className="card p-5">
+
+        <div className="card mb-5 p-5">
           {loading ? (
             <p className="text-sm text-white/60">Loading…</p>
           ) : (
@@ -62,10 +62,16 @@ export default function SettingsPage() {
                 setMsg(null);
                 setSaving(true);
                 try {
-                  const s = await patchSettings({ maxActiveInstances: max });
+                  const s = await patchSettings({
+                    maxActiveInstances: max,
+                    nodeLabel: nodeLabel.trim(),
+                  });
                   setRaw(s as Record<string, unknown>);
                   if (typeof s.maxActiveInstancesParsed === 'number') {
                     setMax(s.maxActiveInstancesParsed);
+                  }
+                  if (typeof s.nodeLabel === 'string') {
+                    setNodeLabel(s.nodeLabel);
                   }
                   setMsg('Saved.');
                 } catch {
@@ -76,7 +82,20 @@ export default function SettingsPage() {
               }}
             >
               <label className="block text-sm text-white/70">
-                Max active instances
+                This node label
+                <input
+                  className="input mt-1.5"
+                  value={nodeLabel}
+                  onChange={(e) => setNodeLabel(e.target.value)}
+                  placeholder="Machine A"
+                />
+              </label>
+              <p className="text-xs text-white/55">
+                Shown in the dashboard and instance lists when this panel aggregates multiple
+                machines.
+              </p>
+              <label className="block text-sm text-white/70">
+                Max active instances (this node)
                 <input
                   type="number"
                   min={1}
@@ -86,23 +105,26 @@ export default function SettingsPage() {
                   onChange={(e) => setMax(Number(e.target.value))}
                 />
               </label>
-              {msg ? (
-                <p className="text-sm text-emerald-200/90">{msg}</p>
-              ) : null}
+              {msg ? <p className="text-sm text-emerald-200/90">{msg}</p> : null}
               <button type="submit" className="btn btn-primary" disabled={saving}>
                 {saving ? 'Saving…' : 'Save'}
               </button>
             </form>
           )}
-          {raw && !loading ? (
-            <details className="mt-6 text-xs text-white/50">
-              <summary className="cursor-pointer text-white/60">Raw keys</summary>
-              <pre className="mt-2 overflow-x-auto rounded-lg bg-black/30 p-2">
-                {JSON.stringify(raw, null, 2)}
-              </pre>
-            </details>
-          ) : null}
         </div>
+
+        <div className="card p-5">
+          <ClusterSettingsSection />
+        </div>
+
+        {raw && !loading ? (
+          <details className="mt-5 text-xs text-white/50">
+            <summary className="cursor-pointer text-white/60">Raw settings keys</summary>
+            <pre className="mt-2 overflow-x-auto rounded-lg bg-black/30 p-2">
+              {JSON.stringify(raw, null, 2)}
+            </pre>
+          </details>
+        ) : null}
       </PageContainer>
     </RequireAuth>
   );

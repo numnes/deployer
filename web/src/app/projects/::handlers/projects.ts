@@ -1,6 +1,8 @@
 import { apiBaseClient, httpJson } from '@/lib/http';
 import { getTokenClient } from '@/lib/client-auth';
 
+import type { NodeRef } from '@/lib/node-ref';
+
 export type Project = {
   id: string;
   slug: string;
@@ -11,7 +13,7 @@ export type Project = {
   maxExistenceLifetimeDays: number | null;
   maxExistenceLifetimeHours: number | null;
   createdAt: string;
-};
+} & NodeRef;
 
 export async function listProjects(): Promise<Project[]> {
   const token = getTokenClient();
