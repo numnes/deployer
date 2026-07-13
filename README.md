@@ -20,17 +20,17 @@ Self-host on a single machine — or aggregate several deployer hosts from one d
 
 Install these on the machine that will run deployer (the `install.sh` script checks **git**, **Node.js**, and **Docker**):
 
-| Dependency | Used for | Install |
-| ---------- | -------- | ------- |
-| **Git** | Clone deployer and app repos | [git-scm.com/downloads](https://git-scm.com/downloads) |
-| **Node.js** (LTS recommended, v18+) | API build, CLI helpers | [nodejs.org/en/download](https://nodejs.org/en/download) · [nvm](https://github.com/nvm-sh/nvm) |
-| **Docker** + **Compose** | Postgres, Redis, and web UI containers | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/) |
-| **PM2** | Runs the deployer API locally; also runs preview instances on the host (default runner) | [pm2.keymetrics.io — Quick start](https://pm2.keymetrics.io/docs/usage/quick-start/) (`npm install -g pm2`) |
-| **nginx** | Reverse proxy for preview URLs (`/{branch-slug}/`) | [nginx.org/en/download](https://nginx.org/en/download.html) · [Ubuntu/Debian](https://nginx.org/en/linux_packages.html) |
+| Dependency                          | Used for                                                                                | Install                                                                                                                 |
+| ----------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Git**                             | Clone deployer and app repos                                                            | [git-scm.com/downloads](https://git-scm.com/downloads)                                                                  |
+| **Node.js** (LTS recommended, v18+) | API build, CLI helpers                                                                  | [nodejs.org/en/download](https://nodejs.org/en/download) · [nvm](https://github.com/nvm-sh/nvm)                         |
+| **Docker** + **Compose**            | Postgres, Redis, and web UI containers                                                  | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/)                                                       |
+| **PM2**                             | Runs the deployer API locally; also runs preview instances on the host (default runner) | [pm2.keymetrics.io — Quick start](https://pm2.keymetrics.io/docs/usage/quick-start/) (`npm install -g pm2`)             |
+| **nginx**                           | Reverse proxy for preview URLs (`/{branch-slug}/`)                                      | [nginx.org/en/download](https://nginx.org/en/download.html) · [Ubuntu/Debian](https://nginx.org/en/linux_packages.html) |
 
 If PM2 is not installed globally, `deployer setup` falls back to `npx pm2` for the API only. For production preview deploys with the **PM2 runner**, install PM2 on the host.
 
-nginx is required to serve preview URLs to browsers, but not to start the deployer stack itself. See [Configure nginx](#configure-nginx).
+nginx is required to serve preview URLs to browsers, but not to start the deployer stack itself. See [Configure nginx](docs/nginx.md).
 
 ### Install and start
 
@@ -110,7 +110,7 @@ deployer project init
 1. Copy the JSON printed by `deployer project init`
 2. Open **Projects → Add project → Import registration JSON**
 3. Paste the JSON and click **Create from JSON** (or **Apply to form** to review first)
-4. Set the **Public URL** if you already know the domain where previews will be served (see [Configure nginx](#configure-nginx) below)
+4. Set the **Public URL** if you already know the domain where previews will be served (see [Configure nginx](docs/nginx.md))
 
 ### 3. Create an API key
 
@@ -135,262 +135,19 @@ Opening or updating a PR against a configured branch triggers a deploy; closing 
 
 More detail: dashboard **Setup → GitHub Actions** and **Setup → Secrets**.
 
-## Configure nginx
-
-Preview URLs are served by **nginx on the deployer host**. The core writes one `*.location` file per branch under the locations directory (default `~/deployer/locations`). Each file proxies `/{branch-slug}/` to the instance’s local port.
-
-**You need a separate nginx `server` block (or equivalent site config) for every domain or subdomain used as a project’s public URL.** If two projects use different hosts — e.g. `preview.app-a.example.com` and `preview.app-b.example.com` — configure nginx for **each** host and point the matching **Public URL** in the dashboard to that host.
-
-### Per domain / subdomain
-
-1. **Pick the hostname** for the project (e.g. `preview.myapp.example.com`).
-2. **Add or update a site** in nginx (`sites-available` / `sites-enabled`, or your distro’s layout).
-3. **Include deployer locations** inside the `server { }` block for that hostname:
-
-   ```nginx
-   include /home/you/deployer/locations/*.location;
-   ```
-
-   Or use the helper (read-only — prints the full file for you to paste):
-
-   ```bash
-   deployer setup nginx
-   deployer setup nginx -f /etc/nginx/sites-enabled/mysite.conf   # skip picker
-   deployer setup nginx -s /etc/nginx/sites-available             # custom directory
-   ```
-
-   It lists configs in `sites-enabled` (or the directory you pass), shows the file with the `include` line added, and tells you to replace the file contents manually (e.g. `sudo nano …`), then run `sudo nginx -t && sudo nginx -s reload`.
-
-4. In the dashboard, set the project **Public URL** to that host (e.g. `https://preview.myapp.example.com`). Branch previews are at `{Public URL}/{branch-slug}/`.
-
-5. After deploys, the core reloads nginx when location files change. After **editing site configs by hand**, test and reload:
-
-   ```bash
-   sudo nginx -t && sudo nginx -s reload
-   ```
-
-Verify from the dashboard: **Setup → Nginx** (directory, `nginx -t`, process check).
-
-## Dashboard
-
-After `deployer setup`, open the web UI (port shown in `deployer status`, often **3001**).
-
-| Area                    | What you can do                                                                                                                                                                       |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Dashboard**           | Host CPU / memory / disk **per connected machine**, aggregated instance counts, active slot usage chart, recent activity with node labels                                          |
-| **Projects**            | List projects (local + remote nodes), **Add project**, open **Settings** per project; **Node** column shows which machine hosts each project                                         |
-| **Projects → Settings** | **Public URL**, per-project **instance lifetime** limits (auto-pause / auto-remove), **Teardown all instances**, **Restart all instances**, **Delete project**                      |
-| **Instances**           | List all previews across nodes; filter by project/branch/status; **Node** column; open a row for logs, pause, activate/redeploy, or remove (remote actions when the cluster key allows) |
-| **Settings**            | Global **max active instances**, **node label** (shown in cluster UI), **cluster credentials** (generate keys) and **connected nodes** (aggregate remote deployers)                   |
-| **Setup**               | Guides for GitHub Actions, secrets, and nginx                                                                                                                                         |
-| **Users → API Keys**    | Create keys used by GitHub Actions (`DEPLOYER_API_KEY`)                                                                                                                               |
-
-Instance status cards on the home dashboard link to `/instances?status=…` with the filter applied.
-
 ## Documentation
 
-| Topic             | Where                                                                            |
-| ----------------- | -------------------------------------------------------------------------------- |
-| Dashboard         | [Dashboard](#dashboard)                                                          |
-| Multi-machine     | [Cluster (multi-machine)](#cluster-multi-machine)                                |
-| Instance lifetime | [Instance lifetime](#instance-lifetime)                                          |
-| Project setup     | [Setup in a project](#setup-in-a-project) · `deployer project init`              |
-| nginx on the host | [Configure nginx](#configure-nginx) · `deployer setup nginx` · **Setup → Nginx** |
-| GitHub Actions    | Dashboard **Setup → GitHub Actions**                                             |
-| Secrets           | Dashboard **Setup → Secrets** (or [Setup in a project](#setup-in-a-project))     |
-| App config        | `examples/deployer.yaml` in each project repo                                    |
-| API reference     | http://localhost:3000/docs after `deployer setup`                                |
-
-### GitHub secrets (in your app repo)
-
-| Name               | Description                       |
-| ------------------ | --------------------------------- |
-| `DEPLOYER_API_URL` | Base URL of your deployer API     |
-| `DEPLOYER_API_KEY` | API key from **Users → API Keys** |
-
-The project slug is embedded in the workflow files when you run `deployer project init` (no GitHub variable needed).
-
-## What you get
-
-Ephemeral **preview URLs** for code review and QA before merge:
-
-- **One URL per branch / PR** — e.g. `https://preview.example.com/feature-xyz/`
-- **Environment queue** — when the active slot limit is reached, new deploys stay `waiting` until a preview is paused or destroyed
-- **Pause / resume / redeploy** — per instance in the dashboard, or **Restart all instances** on a project  
-- **Teardown on PR close** — optional workflow removes the instance automatically  
-- **Bulk teardown** — **Projects → Settings → Teardown all instances** pauses every active instance for a project  
-- **Delete project** — removes the project and destroys all its instances (PM2, nginx, database); checkout directory is removed from disk  
-- **Instance lifetime** — optional per-project limits to auto-pause (active time) or auto-remove (total existence); see [Instance lifetime](#instance-lifetime)  
-- **Multi-machine dashboard** — connect other deployer hosts and manage them from one panel; see [Cluster](#cluster-multi-machine)
-
-### Instance lifetime
-
-In **Projects → Settings**, you can set optional limits per project:
-
-| Limit | Effect |
-| ----- | ------ |
-| **Max active lifetime** (days / hours) | While `active`, counts down; when it expires the instance is **paused** (runtime stopped, record kept) |
-| **Max existence lifetime** (days / hours) | From creation; when it expires the instance is **destroyed** (PM2/Docker + nginx + DB record; checkout removed) |
-
-The scheduler runs every minute. The **Instances** list and instance detail page show `activeExpiresAt` and `existenceExpiresAt` when limits apply.
-
-### Instance states
-
-Preview / ephemeral environment lifecycle:
-
-| Status      | Meaning                                    |
-| ----------- | ------------------------------------------ |
-| `active`    | Running on the host (PM2 + nginx) — live review app |
-| `waiting`   | Registered, waiting for a free slot (queued preview) |
-| `deploying` | Deploy job in progress                     |
-| `paused`    | Stopped on the host, still in the database |
-| `error`     | Last deploy or activate failed             |
-
-## Cluster (multi-machine)
-
-Run deployer on **machine A** (hub) and **machine B** (spoke) and manage both from A's dashboard.
-
-### Setup flow
-
-**On machine B** (the node to monitor):
-
-1. **Settings** → set a **Node label** (e.g. `prod-b`)
-2. **Settings → Cluster credentials** → generate a cluster key (`clu_…`, shown once)
-3. Choose permissions:
-   - **Read-only (incl. logs)** — dashboard, projects, instances, and log viewing
-   - **Read & write** — also pause, activate/redeploy, and remove instances from the hub panel
-4. Ensure B's API is reachable from A (LAN or public URL, not only `127.0.0.1`)
-
-**On machine A** (central panel):
-
-1. **Settings → Connected nodes** → add B's **API URL** and paste the `clu_…` key
-2. Click **Test** to verify connectivity and detect the key's permission level
-3. Dashboard, **Projects**, and **Instances** now include data from B, with a **Node** badge per row
-
-### How it works
-
-- Hub-and-spoke over HTTP: A calls B's `/cluster/*` endpoints with header `X-Deployer-Cluster-Key`
-- B enforces the key scope — write actions return `403` on read-only keys even if A tries them
-- Remote instance IDs use the form `r:{nodeId}:{remoteId}` in the hub API
-- Remote node credentials are **encrypted at rest** in A's Postgres with `DEPLOYER_CLUSTER_SECRET` (see [Configuration](#configuration)); decrypted only when making outbound cluster calls
-- Project settings in the hub apply only to **local** projects; remote projects are read-only for configuration
-
-### Limitations
-
-- Cluster keys on B are stored hashed (like API keys); the plaintext `clu_…` is shown once at creation
-- No automatic health polling — use **Test** on a connected node to refresh status and scope
-- Re-adding a node after rotating `DEPLOYER_CLUSTER_SECRET` requires pasting the cluster key again
-
-## Architecture (short)
-
-Self-hosted **preview environment controller** — single host by default, optional multi-machine aggregation:
-
-- **`core/`** — Bash scripts: clone, build, PM2/Docker, nginx locations, pause, destroy  
-- **`api/`** — NestJS API, Postgres, BullMQ/Redis job queue (deploy / teardown webhooks), cluster fan-out  
-- **`web/`** — Next.js dashboard (instances, projects, cluster settings, setup guides)  
-
-Deploy is triggered with `POST /deploy` (API key), typically from GitHub Actions on pull request open/update. The API queues or runs the core script; closing the PR can call `POST /deploy/destroy` for automatic cleanup.
-
-**Runtimes:** PM2 (default) and Docker per project (`deployer project init`). Kubernetes support is planned.
-
-## Configuration
-
-Main file: `api/.env` — **generated automatically** on `deployer setup` with Postgres/Redis/API/web ports, a random `JWT_SECRET`, `DEPLOYER_SETUP_KEY`, and `DEPLOYER_CLUSTER_SECRET`. Connection ports are picked from free local ports when defaults (3000, 3001, 5432, 6480) are in use. Re-running `setup` updates connection settings but **keeps** existing `JWT_SECRET`, `DEPLOYER_SETUP_KEY`, and `DEPLOYER_CLUSTER_SECRET`.
-
-| Variable                    | Purpose                                                               |
-| --------------------------- | --------------------------------------------------------------------- |
-| `PORT`                      | API listen port (default 3000)                                        |
-| `DATABASE_URL`              | Postgres (`postgresql://postgres:deployer@localhost:<port>/deployer`) |
-| `REDIS_HOST` / `REDIS_PORT` | Redis for BullMQ                                                      |
-| `CORS_ORIGIN`               | Web UI URL allowed by the API                                         |
-| `DEPLOYER_WORK_ROOT`        | Where branch checkouts live on disk                                   |
-| `DEPLOYER_CORE_DIR`         | Path to `core/`                                                       |
-| `DEPLOYER_LOCATIONS_DIR`    | nginx `*.location` files (default `~/deployer/locations`)             |
-| `JWT_SECRET`                | Auth tokens (auto-generated on first setup)                           |
-| `DEPLOYER_SETUP_KEY`        | Root-only key for privileged bootstrap endpoints (auto-generated)     |
-| `DEPLOYER_CLUSTER_SECRET`   | Encrypts connected-node cluster keys in Postgres (auto-generated; must stay stable across restarts) |
-| `TYPEORM_SYNC`              | `true` for dev schema sync                                            |
-
-### Privileged endpoints (setup key)
-
-`POST /auth/register` and `GET /users` are not public. They require either a
-valid dashboard JWT or the root-only **setup key** sent in the
-`X-Deployer-Setup-Key` header. The key lives only on the root machine in
-`api/.env` (`DEPLOYER_SETUP_KEY`), so these endpoints stay safe even when the
-API is publicly exposed. `POST /auth/register` accepts **only** the setup key;
-`GET /users` accepts the JWT (dashboard) or the setup key (setup script).
-
-The setup script (`seed-default-user.js`) uses these endpoints with the setup key
-instead of connecting to Postgres directly.
-
-Skip or automate admin user creation:
-
-```bash
-DEPLOYER_SKIP_SEED_USER=1 deployer setup          # never prompt
-DEPLOYER_SEED_EMAIL=you@example.com DEPLOYER_SEED_PASSWORD=yourpassword deployer setup
-```
-
-On restart, if users already exist you are asked whether to reset a password or add another user; press **N** to keep the current accounts.
-
-## CLI reference
-
-### Stack commands
-
-| Command                            | Description                                                                   |
-| ---------------------------------- | ----------------------------------------------------------------------------- |
-| `deployer setup`                   | Start Postgres, Redis, web (Docker) and API (PM2); creates/updates `api/.env` |
-| `deployer up`, `deployer start`    | Same as `deployer setup`                                                      |
-| `deployer down`, `deployer stop`   | Stop API and containers (asks for confirmation)                               |
-| `deployer restart`                 | `down` then `setup` (asks for confirmation)                                   |
-| `deployer status`                  | Show ports, Docker containers, and PM2 API process                            |
-| `deployer logs api`                | Follow API logs (PM2)                                                         |
-| `deployer logs web`                | Follow web container logs                                                     |
-| `deployer update`, `deployer pull` | `git pull` in the install dir + refresh CLI symlink                           |
-| `deployer root`, `deployer path`   | Print install directory                                                       |
-| `deployer help`                    | Show command summary                                                          |
-
-Options for `down` / `restart`: `-y`, `--yes`, or `DEPLOYER_YES=1` to skip confirmation.
-
-### Project commands
-
-| Command                        | Description                                                                |
-| ------------------------------ | -------------------------------------------------------------------------- |
-| `deployer project init`        | Copy workflows + `deployer.yaml` into an app repo; print registration JSON |
-| `deployer project init --help` | Options: `PATH`, `-f`/`--force`, `--branches`                              |
-
-### nginx helper
-
-| Command                       | Description                                                                    |
-| ----------------------------- | ------------------------------------------------------------------------------ |
-| `deployer setup nginx`        | List `sites-enabled`, print config with `include …/*.location;` (manual paste) |
-| `deployer setup nginx --help` | Options: `-f`/`--file`, `-s`/`--sites-dir`                                     |
-
-### Examples
-
-```bash
-deployer setup
-deployer status
-deployer logs api
-deployer project init
-deployer project init ../my-app --branches main,develop --force
-deployer setup nginx
-deployer setup nginx -f /etc/nginx/sites-enabled/preview.example.com
-deployer update
-```
-
-### Install & runtime env vars
-
-| Variable                      | Purpose                                                                  |
-| ----------------------------- | ------------------------------------------------------------------------ |
-| `DEPLOYER_INSTALL_DIR`        | Clone destination for `install.sh` (default `~/deployer`)                |
-| `DEPLOYER_REPO_URL`           | Git URL for `install.sh`                                                 |
-| `DEPLOYER_BIN_DIR`            | Where to link the `deployer` executable (default `~/.local/bin`)         |
-| `DEPLOYER_ROOT`               | Override install directory for the CLI                                   |
-| `DEPLOYER_YES`                | Skip confirmation on `down` / `restart`                                  |
-| `DEPLOYER_PROJECT_SLUG`       | Non-interactive slug for `project init`                                  |
-| `DEPLOYER_PROJECT_GIT_URL`    | Non-interactive git URL for `project init`                               |
-| `DEPLOYER_PROJECT_SERVER_URL` | Optional Public URL for `project init`                                   |
-| `NGINX_SITES_ENABLED`         | Default directory for `setup nginx` (default `/etc/nginx/sites-enabled`) |
+| Topic             | Guide |
+| ----------------- | ----- |
+| Dashboard         | [docs/dashboard.md](docs/dashboard.md) |
+| Instances & lifetime | [docs/instances.md](docs/instances.md) |
+| Cluster (multi-machine) | [docs/cluster.md](docs/cluster.md) |
+| Configure nginx   | [docs/nginx.md](docs/nginx.md) |
+| Architecture      | [docs/architecture.md](docs/architecture.md) |
+| Configuration     | [docs/configuration.md](docs/configuration.md) |
+| CLI reference     | [docs/cli.md](docs/cli.md) |
+| App config        | `examples/deployer.yaml` in each project repo |
+| API reference     | http://localhost:3000/docs after `deployer setup` |
 
 ## License
 
