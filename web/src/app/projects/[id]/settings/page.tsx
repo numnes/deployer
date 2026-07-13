@@ -17,6 +17,17 @@ import {
   type Project,
 } from '../../::handlers/projects';
 
+function parseLifetimeField(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed === '') return null;
+  const n = Number.parseInt(trimmed, 10);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function lifetimeFieldValue(n: number | null | undefined): string {
+  return n == null ? '' : String(n);
+}
+
 export default function ProjectSettingsPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
@@ -25,6 +36,10 @@ export default function ProjectSettingsPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [instanceCount, setInstanceCount] = useState(0);
   const [serverUrl, setServerUrl] = useState('');
+  const [activeLifetimeDays, setActiveLifetimeDays] = useState('');
+  const [activeLifetimeHours, setActiveLifetimeHours] = useState('');
+  const [existenceLifetimeDays, setExistenceLifetimeDays] = useState('');
+  const [existenceLifetimeHours, setExistenceLifetimeHours] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [bulkLoading, setBulkLoading] = useState<string | null>(null);
@@ -39,6 +54,10 @@ export default function ProjectSettingsPage() {
       const [p, instances] = await Promise.all([getProject(id), listInstances()]);
       setProject(p);
       setServerUrl(p.serverUrl ?? '');
+      setActiveLifetimeDays(lifetimeFieldValue(p.maxActiveLifetimeDays));
+      setActiveLifetimeHours(lifetimeFieldValue(p.maxActiveLifetimeHours));
+      setExistenceLifetimeDays(lifetimeFieldValue(p.maxExistenceLifetimeDays));
+      setExistenceLifetimeHours(lifetimeFieldValue(p.maxExistenceLifetimeHours));
       setInstanceCount(instances.filter((i) => i.projectId === id).length);
     } catch {
       setError('Project not found or access denied.');
@@ -97,12 +116,20 @@ export default function ProjectSettingsPage() {
                     const trimmed = serverUrl.trim();
                     const updated = await patchProject(id, {
                       serverUrl: trimmed === '' ? null : trimmed,
+                      maxActiveLifetimeDays: parseLifetimeField(activeLifetimeDays),
+                      maxActiveLifetimeHours: parseLifetimeField(activeLifetimeHours),
+                      maxExistenceLifetimeDays: parseLifetimeField(existenceLifetimeDays),
+                      maxExistenceLifetimeHours: parseLifetimeField(existenceLifetimeHours),
                     });
                     setProject(updated);
+                    setActiveLifetimeDays(lifetimeFieldValue(updated.maxActiveLifetimeDays));
+                    setActiveLifetimeHours(lifetimeFieldValue(updated.maxActiveLifetimeHours));
+                    setExistenceLifetimeDays(lifetimeFieldValue(updated.maxExistenceLifetimeDays));
+                    setExistenceLifetimeHours(lifetimeFieldValue(updated.maxExistenceLifetimeHours));
                     setSaved(true);
                     router.refresh();
                   } catch {
-                    setError('Could not save. Check the URL (https://…).');
+                    setError('Could not save. Check the fields and try again.');
                   } finally {
                     setSaving(false);
                   }
@@ -132,6 +159,81 @@ export default function ProjectSettingsPage() {
                     ).
                   </p>
                 </div>
+
+                <div className="border-t border-[#3d4048] pt-5">
+                  <h2 className="text-sm font-medium text-[#e8eaed]">Instance lifetime</h2>
+                  <p className="mt-1 text-xs text-[#8b919a]">
+                    Leave fields empty for no limit. Instances stay active until manual teardown.
+                    Limits are checked every minute.
+                  </p>
+
+                  <div className="mt-4 space-y-4">
+                    <div>
+                      <p className="text-sm text-white/70">Max active time</p>
+                      <p className="mt-0.5 text-xs text-white/55">
+                        After this duration in <span className="font-semibold">active</span>{' '}
+                        status, the instance is paused automatically (checkout kept on disk).
+                      </p>
+                      <div className="mt-2 grid grid-cols-2 gap-3 sm:max-w-md">
+                        <div>
+                          <label className="mb-1 block text-xs text-white/55">Days</label>
+                          <input
+                            className="input"
+                            type="number"
+                            min={0}
+                            placeholder="no limit"
+                            value={activeLifetimeDays}
+                            onChange={(e) => setActiveLifetimeDays(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs text-white/55">Hours</label>
+                          <input
+                            className="input"
+                            type="number"
+                            min={0}
+                            placeholder="no limit"
+                            value={activeLifetimeHours}
+                            onChange={(e) => setActiveLifetimeHours(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-sm text-white/70">Max existence time</p>
+                      <p className="mt-0.5 text-xs text-white/55">
+                        After this duration since creation, the instance is removed and the cloned
+                        branch files on disk are deleted.
+                      </p>
+                      <div className="mt-2 grid grid-cols-2 gap-3 sm:max-w-md">
+                        <div>
+                          <label className="mb-1 block text-xs text-white/55">Days</label>
+                          <input
+                            className="input"
+                            type="number"
+                            min={0}
+                            placeholder="no limit"
+                            value={existenceLifetimeDays}
+                            onChange={(e) => setExistenceLifetimeDays(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs text-white/55">Hours</label>
+                          <input
+                            className="input"
+                            type="number"
+                            min={0}
+                            placeholder="no limit"
+                            value={existenceLifetimeHours}
+                            onChange={(e) => setExistenceLifetimeHours(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex gap-3">
                   <button className="btn btn-primary" type="submit" disabled={saving}>
                     {saving ? 'Saving…' : 'Save'}
@@ -152,7 +254,7 @@ export default function ProjectSettingsPage() {
                     onClick={async () => {
                       if (
                         !confirm(
-                          `Teardown all active instances for "${project.slug}"?\n\nThis pauses every active instance (stops PM2/nginx). Records stay in the database.`,
+                          `Teardown all active instances for "${project.slug}"?\n\nThis pauses every active instance (stops PM2/Docker and nginx). Records and checkout on disk are kept.`,
                         )
                       ) {
                         return;
@@ -211,8 +313,8 @@ export default function ProjectSettingsPage() {
               <div className="mt-8 border-t border-[#3d4048] pt-6">
                 <h2 className="text-sm font-medium text-[#e8eaed]">Delete project</h2>
                 <p className="mt-1 text-xs text-[#8b919a]">
-                  Destroys every instance (PM2, nginx, database record) and removes this project.
-                  This cannot be undone.
+                  Destroys every instance (runtime, nginx, database record, checkout on disk) and
+                  removes this project. This cannot be undone.
                 </p>
                 <button
                   type="button"

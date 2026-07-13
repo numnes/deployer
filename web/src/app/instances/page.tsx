@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { listInstances, runnerLabel, type InstanceRow } from './::handlers/instances';
+import { InstanceLifetimeCell } from './InstanceLifetimeCell';
 
 const INSTANCE_STATUSES = ['waiting', 'deploying', 'active', 'paused', 'error'] as const;
 
@@ -194,6 +195,9 @@ function InstancesPageContent() {
                   Status
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
+                  Lifetime
+                </th>
+                <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
                   Online
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
@@ -259,6 +263,9 @@ function InstancesPageContent() {
                   ) : null}
                 </td>
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
+                  <InstanceLifetimeCell row={i} />
+                </td>
+                <td className="border-b border-white/10 px-3 py-2 text-white/70">
                   {(i.runtimeOnline ?? i.pm2Online) ? (
                     <span className="text-emerald-200/90">yes</span>
                   ) : (
@@ -300,7 +307,7 @@ function InstancesPageContent() {
             ))}
             {instances && filtered && filtered.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-3 py-3 text-white/70">
+                <td colSpan={12} className="px-3 py-3 text-white/70">
                   {hasFilters
                     ? 'No instances match the current filters.'
                     : 'No instances yet (they appear here after a successful deploy).'}
@@ -309,7 +316,7 @@ function InstancesPageContent() {
             ) : null}
             {!instances && !error ? (
               <tr>
-                <td colSpan={11} className="px-3 py-3 text-white/70">
+                <td colSpan={12} className="px-3 py-3 text-white/70">
                   Loading…
                 </td>
               </tr>

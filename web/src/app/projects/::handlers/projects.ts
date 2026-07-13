@@ -6,6 +6,10 @@ export type Project = {
   slug: string;
   gitUrl: string;
   serverUrl: string | null;
+  maxActiveLifetimeDays: number | null;
+  maxActiveLifetimeHours: number | null;
+  maxExistenceLifetimeDays: number | null;
+  maxExistenceLifetimeHours: number | null;
   createdAt: string;
 };
 
@@ -41,7 +45,13 @@ export async function createProject(body: {
 
 export async function patchProject(
   id: string,
-  body: { serverUrl?: string | null },
+  body: {
+    serverUrl?: string | null;
+    maxActiveLifetimeDays?: number | null;
+    maxActiveLifetimeHours?: number | null;
+    maxExistenceLifetimeDays?: number | null;
+    maxExistenceLifetimeHours?: number | null;
+  },
 ): Promise<Project> {
   const token = getTokenClient();
   return await httpJson<Project>(`${apiBaseClient()}/projects/${id}`, {

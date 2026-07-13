@@ -50,6 +50,10 @@ export class PreviewInstance {
   @Column({ name: 'last_deploy_error', type: 'text', nullable: true })
   lastDeployError: string | null;
 
+  /** Momento em que a instância entrou em status active (para limite de tempo ativo). */
+  @Column({ name: 'activated_at', type: 'timestamptz', nullable: true })
+  activatedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

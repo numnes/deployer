@@ -23,6 +23,10 @@ export type InstanceRow = {
   monit?: { memory?: number; cpu?: number } | null;
   previewUrl: string | null;
   lastDeployError: string | null;
+  activeExpiresAt: string | null;
+  existenceExpiresAt: string | null;
+  hasActiveLifetimeLimit: boolean;
+  hasExistenceLifetimeLimit: boolean;
   createdAt: string;
   updatedAt: string;
 };

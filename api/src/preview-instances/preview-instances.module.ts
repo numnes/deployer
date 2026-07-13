@@ -4,6 +4,7 @@ import { PreviewInstanceStatusEvent } from '../entities/preview-instance-status-
 import { PreviewInstance } from '../entities/preview-instance.entity';
 import { ProjectsModule } from '../projects/projects.module';
 import { SettingsModule } from '../settings/settings.module';
+import { InstanceLifetimeScheduler } from './instance-lifetime.scheduler';
 import { PreviewInstancesService } from './preview-instances.service';
 
 @Module({
@@ -12,7 +13,7 @@ import { PreviewInstancesService } from './preview-instances.service';
     forwardRef(() => ProjectsModule),
     SettingsModule,
   ],
-  providers: [PreviewInstancesService],
+  providers: [PreviewInstancesService, InstanceLifetimeScheduler],
   exports: [PreviewInstancesService],
 })
 export class PreviewInstancesModule {}

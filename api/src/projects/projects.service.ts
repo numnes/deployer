@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Project } from '../entities/project.entity';
 import { PreviewInstancesService } from '../preview-instances/preview-instances.service';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
 
 @Injectable()
 export class ProjectsService {
@@ -43,13 +44,24 @@ export class ProjectsService {
     return p;
   }
 
-  async updateServerUrl(id: string, serverUrl: string | null | undefined) {
+  async update(id: string, dto: UpdateProjectDto) {
     const p = await this.findOne(id);
-    if (serverUrl === undefined) {
-      return p;
+    if (dto.serverUrl !== undefined) {
+      const trimmed = dto.serverUrl?.trim();
+      p.serverUrl = trimmed ? trimmed : null;
     }
-    const trimmed = serverUrl?.trim();
-    p.serverUrl = trimmed ? trimmed : null;
+    if (dto.maxActiveLifetimeDays !== undefined) {
+      p.maxActiveLifetimeDays = dto.maxActiveLifetimeDays;
+    }
+    if (dto.maxActiveLifetimeHours !== undefined) {
+      p.maxActiveLifetimeHours = dto.maxActiveLifetimeHours;
+    }
+    if (dto.maxExistenceLifetimeDays !== undefined) {
+      p.maxExistenceLifetimeDays = dto.maxExistenceLifetimeDays;
+    }
+    if (dto.maxExistenceLifetimeHours !== undefined) {
+      p.maxExistenceLifetimeHours = dto.maxExistenceLifetimeHours;
+    }
     return this.repo.save(p);
   }
 

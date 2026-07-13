@@ -23,6 +23,11 @@ import { fetchPm2ByName } from '../instances/pm2-list.helper';
 import { fetchDockerByName } from '../instances/docker-list.helper';
 import { SettingsService } from '../settings/settings.service';
 import type { PreviewStatus } from './preview-status';
+import {
+  computeActiveExpiresAt,
+  computeExistenceExpiresAt,
+  lifetimeDurationMs,
+} from './instance-lifetime.util';
 
 export type { DeployMeta } from '../deploy/deploy-meta';
 
@@ -67,6 +72,12 @@ export type InstanceListItem = {
   previewUrl: string | null;
   /** Mensagem do último deploy com falha (status error). */
   lastDeployError: string | null;
+  /** Pausa automática quando active (ISO). null = sem limite ou não está active. */
+  activeExpiresAt: Date | null;
+  /** Remoção automática desde criação (ISO). null = sem limite. */
+  existenceExpiresAt: Date | null;
+  hasActiveLifetimeLimit: boolean;
+  hasExistenceLifetimeLimit: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -104,6 +115,9 @@ export class PreviewInstancesService {
     const prev = row.status;
     if (prev === next) return row;
     row.status = next;
+    if (next === 'active') {
+      row.activatedAt = new Date();
+    }
     const saved = await this.repo.save(row);
     await this.appendEvent(saved.id, prev, next);
     return saved;
@@ -339,6 +353,23 @@ export class PreviewInstancesService {
       base && r.branchSlug
         ? `${base.replace(/\/+$/, '')}/${r.branchSlug}/`
         : null;
+    const project = r.project;
+    const activeExpiresAt =
+      project != null ? computeActiveExpiresAt(r, project) : null;
+    const existenceExpiresAt =
+      project != null ? computeExistenceExpiresAt(r, project) : null;
+    const hasActiveLifetimeLimit =
+      project != null &&
+      lifetimeDurationMs(
+        project.maxActiveLifetimeDays,
+        project.maxActiveLifetimeHours,
+      ) != null;
+    const hasExistenceLifetimeLimit =
+      project != null &&
+      lifetimeDurationMs(
+        project.maxExistenceLifetimeDays,
+        project.maxExistenceLifetimeHours,
+      ) != null;
     return {
       id: r.id,
       projectId: r.projectId,
@@ -359,6 +390,10 @@ export class PreviewInstancesService {
       monit: runtime.monit ?? null,
       previewUrl,
       lastDeployError: r.lastDeployError,
+      activeExpiresAt,
+      existenceExpiresAt,
+      hasActiveLifetimeLimit,
+      hasExistenceLifetimeLimit,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
     };
@@ -557,5 +592,65 @@ export class PreviewInstancesService {
       }
     }
     return { restarted, skipped, failed };
+  }
+
+  /**
+   * Pausa instâncias ativas além do limite de tempo ativo do projeto e remove
+   * instâncias além do limite de existência (destroy + checkout em disco).
+   * Chamado pelo scheduler a cada minuto.
+   */
+  async enforceLifetimeLimits(): Promise<{ paused: number; destroyed: number }> {
+    const rows = await this.repo.find({ relations: ['project'] });
+    const now = Date.now();
+    let paused = 0;
+    let destroyed = 0;
+
+    for (const row of rows) {
+      if (!row.project) continue;
+      const project = row.project;
+
+      const existenceMs = lifetimeDurationMs(
+        project.maxExistenceLifetimeDays,
+        project.maxExistenceLifetimeHours,
+      );
+      if (existenceMs != null) {
+        const age = now - row.createdAt.getTime();
+        if (age >= existenceMs) {
+          try {
+            await this.destroyInstanceById(row.id);
+            destroyed++;
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            this.log.warn(
+              `Lifetime destroy ${row.project.slug}/${row.branch}: ${msg}`,
+            );
+          }
+          continue;
+        }
+      }
+
+      if (row.status !== 'active') continue;
+
+      const activeMs = lifetimeDurationMs(
+        project.maxActiveLifetimeDays,
+        project.maxActiveLifetimeHours,
+      );
+      if (activeMs == null) continue;
+
+      const activeSince = (row.activatedAt ?? row.updatedAt).getTime();
+      if (now - activeSince < activeMs) continue;
+
+      try {
+        await this.pauseInstance(row.id);
+        paused++;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.log.warn(
+          `Lifetime pause ${row.project.slug}/${row.branch}: ${msg}`,
+        );
+      }
+    }
+
+    return { paused, destroyed };
   }
 }

@@ -54,7 +54,7 @@ export class ProjectsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProjectDto,
   ) {
-    return this.projects.updateServerUrl(id, dto.serverUrl);
+    return this.projects.update(id, dto);
   }
 
   @ApiBearerAuth('jwt')

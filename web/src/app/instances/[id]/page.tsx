@@ -15,6 +15,10 @@ import {
   removeInstance,
 } from './::handlers/detail';
 import { runnerLabel, type InstanceRow } from '../::handlers/instances';
+import {
+  activeLifetimePausedHint,
+  lifetimeExpiryDisplay,
+} from '@/lib/instance-lifetime';
 
 export default function InstanceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -273,6 +277,58 @@ export default function InstanceDetailPage() {
                   <dt className="text-white/55">Updated</dt>
                   <dd className="text-white/80">
                     {new Date(row.updatedAt).toLocaleString('en-US')}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-white/55">Auto-pause at</dt>
+                  <dd className="text-white/80">
+                    {(() => {
+                      const hint = activeLifetimePausedHint(
+                        row.status,
+                        row.hasActiveLifetimeLimit,
+                        row.activeExpiresAt,
+                      );
+                      if (hint) {
+                        return <span className="text-white/55">{hint}</span>;
+                      }
+                      const d = lifetimeExpiryDisplay(row.activeExpiresAt);
+                      return (
+                        <span className={d.expired ? 'text-rose-300/90' : undefined}>
+                          {row.activeExpiresAt ? (
+                            <>
+                              {d.title}
+                              {!d.expired ? (
+                                <span className="ml-1 text-xs text-white/50">({d.text})</span>
+                              ) : null}
+                            </>
+                          ) : (
+                            <span className="text-white/45">No limit</span>
+                          )}
+                        </span>
+                      );
+                    })()}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-white/55">Auto-remove at</dt>
+                  <dd className="text-white/80">
+                    {(() => {
+                      const d = lifetimeExpiryDisplay(row.existenceExpiresAt);
+                      return (
+                        <span className={d.expired ? 'text-rose-300/90' : undefined}>
+                          {row.existenceExpiresAt ? (
+                            <>
+                              {d.title}
+                              {!d.expired ? (
+                                <span className="ml-1 text-xs text-white/50">({d.text})</span>
+                              ) : null}
+                            </>
+                          ) : (
+                            <span className="text-white/45">No limit</span>
+                          )}
+                        </span>
+                      );
+                    })()}
                   </dd>
                 </div>
               </dl>
