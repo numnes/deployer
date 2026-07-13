@@ -7,7 +7,7 @@ import { ClientTable } from '@/components/ClientTable';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { listInstances, type InstanceRow } from './::handlers/instances';
+import { listInstances, runnerLabel, type InstanceRow } from './::handlers/instances';
 
 const INSTANCE_STATUSES = ['waiting', 'deploying', 'active', 'paused', 'error'] as const;
 
@@ -183,7 +183,10 @@ function InstancesPageContent() {
                   Branch
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
-                  PM2
+                  Runner
+                </th>
+                <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
+                  Runtime
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
                   Port
@@ -192,13 +195,13 @@ function InstancesPageContent() {
                   Status
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
-                  PM2 online
+                  Online
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
                   Preview
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
-                  PM2 status
+                  Runtime status
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
                   CPU
@@ -232,8 +235,13 @@ function InstancesPageContent() {
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
                   {i.branch}
                 </td>
+                <td className="border-b border-white/10 px-3 py-2 text-white/70">
+                  <span className="rounded-md bg-white/10 px-2 py-0.5 text-xs">
+                    {runnerLabel(i.runner)}
+                  </span>
+                </td>
                 <td className="border-b border-white/10 px-3 py-2 font-mono text-xs text-white/70">
-                  {i.pm2Name}
+                  {i.runtimeName ?? i.pm2Name}
                 </td>
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
                   {i.port ?? '—'}
@@ -244,7 +252,7 @@ function InstancesPageContent() {
                   </span>
                 </td>
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
-                  {i.pm2Online ? (
+                  {(i.runtimeOnline ?? i.pm2Online) ? (
                     <span className="text-emerald-200/90">yes</span>
                   ) : (
                     <span className="text-amber-200/90">no</span>
@@ -265,21 +273,27 @@ function InstancesPageContent() {
                   )}
                 </td>
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
-                  {i.pm2Status ?? '—'}
+                  {i.runtimeStatus ?? i.pm2Status ?? '—'}
                 </td>
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
-                  {typeof i.monit?.cpu === 'number' ? `${i.monit.cpu}%` : '—'}
+                  {i.runner === 'docker'
+                    ? '—'
+                    : typeof i.monit?.cpu === 'number'
+                      ? `${i.monit.cpu}%`
+                      : '—'}
                 </td>
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
-                  {typeof i.monit?.memory === 'number'
-                    ? `${Math.round(i.monit.memory / (1024 * 1024))} MB`
-                    : '—'}
+                  {i.runner === 'docker'
+                    ? '—'
+                    : typeof i.monit?.memory === 'number'
+                      ? `${Math.round(i.monit.memory / (1024 * 1024))} MB`
+                      : '—'}
                 </td>
               </tr>
             ))}
             {instances && filtered && filtered.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-3 py-3 text-white/70">
+                <td colSpan={11} className="px-3 py-3 text-white/70">
                   {hasFilters
                     ? 'No instances match the current filters.'
                     : 'No instances yet (they appear here after a successful deploy).'}
@@ -288,7 +302,7 @@ function InstancesPageContent() {
             ) : null}
             {!instances && !error ? (
               <tr>
-                <td colSpan={10} className="px-3 py-3 text-white/70">
+                <td colSpan={11} className="px-3 py-3 text-white/70">
                   Loading…
                 </td>
               </tr>

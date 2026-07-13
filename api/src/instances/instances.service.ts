@@ -6,7 +6,6 @@ import {
   PreviewInstancesService,
   type InstanceListItem,
 } from '../preview-instances/preview-instances.service';
-import { fetchPm2ByName } from './pm2-list.helper';
 
 const execFileAsync = promisify(execFile);
 
@@ -20,13 +19,13 @@ export class InstancesService {
   ) {}
 
   async listForApi(): Promise<InstanceListItem[]> {
-    const pm2 = await fetchPm2ByName(this.config);
-    return this.previewInstances.findAllForApi(pm2);
+    const maps = await this.previewInstances.fetchRuntimeMaps();
+    return this.previewInstances.findAllForApi(maps);
   }
 
   async getOneForApi(id: string): Promise<InstanceListItem> {
-    const pm2 = await fetchPm2ByName(this.config);
-    return this.previewInstances.findOneForApi(id, pm2);
+    const maps = await this.previewInstances.fetchRuntimeMaps();
+    return this.previewInstances.findOneForApi(id, maps);
   }
 
   async pause(id: string): Promise<InstanceListItem> {

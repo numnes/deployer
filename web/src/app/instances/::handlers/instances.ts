@@ -9,16 +9,26 @@ export type InstanceRow = {
   branch: string;
   branchSlug: string;
   pm2Name: string;
+  runtimeName: string;
+  runner: string;
   port: number | null;
   status: string;
+  runtimeOnline: boolean;
+  runtimeStatus: string | null;
+  /** @deprecated use runtimeOnline */
   pm2Online: boolean;
   active: boolean;
+  /** @deprecated use runtimeStatus */
   pm2Status: string | null;
   monit?: { memory?: number; cpu?: number } | null;
   previewUrl: string | null;
   createdAt: string;
   updatedAt: string;
 };
+
+export function runnerLabel(runner: string | undefined): string {
+  return runner === 'docker' ? 'Docker' : 'PM2';
+}
 
 export async function listInstances(): Promise<InstanceRow[]> {
   const token = getTokenClient();

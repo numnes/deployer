@@ -19,12 +19,24 @@ import { PreviewInstance } from '../entities/preview-instance.entity';
 import { PreviewInstanceStatusEvent } from '../entities/preview-instance-status-event.entity';
 import { ProjectsService } from '../projects/projects.service';
 import { fetchPm2ByName } from '../instances/pm2-list.helper';
+import { fetchDockerByName } from '../instances/docker-list.helper';
 import { SettingsService } from '../settings/settings.service';
 import type { PreviewStatus } from './preview-status';
 
 export type { DeployMeta } from '../deploy/deploy-meta';
 
 const execFileAsync = promisify(execFile);
+
+export type RuntimeInfo = {
+  online: boolean;
+  status: string | null;
+  monit?: { memory?: number; cpu?: number } | null;
+};
+
+export type RuntimeMaps = {
+  pm2: Map<string, { status: string | null; monit?: { memory?: number; cpu?: number } }>;
+  docker: Map<string, { running: boolean; status: string | null }>;
+};
 
 export type InstanceListItem = {
   id: string;
@@ -34,12 +46,21 @@ export type InstanceListItem = {
   branch: string;
   branchSlug: string;
   pm2Name: string;
+  /** Nome do processo/container em execução (pm2 name ou docker container). */
+  runtimeName: string;
+  /** pm2 | docker */
+  runner: string;
   port: number | null;
   status: string;
-  /** PM2 reporta processo online (pode divergir do status do banco). */
+  /** Runtime (pm2 ou docker) reporta processo online (pode divergir do status do banco). */
+  runtimeOnline: boolean;
+  /** Status bruto do runtime (ex.: "online" no pm2, "Up 2 minutes" no docker). */
+  runtimeStatus: string | null;
+  /** @deprecated use runtimeOnline */
   pm2Online: boolean;
-  /** @deprecated use pm2Online */
+  /** @deprecated use runtimeOnline */
   active: boolean;
+  /** @deprecated use runtimeStatus */
   pm2Status: string | null;
   monit?: { memory?: number; cpu?: number } | null;
   previewUrl: string | null;
@@ -272,15 +293,35 @@ export class PreviewInstancesService {
     await this.processWaitingQueue();
   }
 
-  private buildListItem(
-    r: PreviewInstance,
-    pm2?: {
-      status: string | null;
-      monit?: { memory?: number; cpu?: number };
-    },
-  ): InstanceListItem {
-    const pm2Online =
-      !!pm2 && typeof pm2.status === 'string' && pm2.status === 'online';
+  /** Busca o estado de runtime (pm2 + docker) em paralelo. */
+  async fetchRuntimeMaps(): Promise<RuntimeMaps> {
+    const [pm2, docker] = await Promise.all([
+      fetchPm2ByName(this.config),
+      fetchDockerByName(this.config),
+    ]);
+    return { pm2, docker };
+  }
+
+  /** Resolve o runtime da instância conforme o runner gravado no banco. */
+  private resolveRuntime(r: PreviewInstance, maps: RuntimeMaps): RuntimeInfo {
+    if (r.runner === 'docker') {
+      const d = maps.docker.get(r.pm2Name);
+      return {
+        online: d?.running ?? false,
+        status: d?.status ?? null,
+        monit: null,
+      };
+    }
+    const p = maps.pm2.get(r.pm2Name);
+    return {
+      online: !!p && p.status === 'online',
+      status: p?.status ?? null,
+      monit: p?.monit ?? null,
+    };
+  }
+
+  private buildListItem(r: PreviewInstance, maps: RuntimeMaps): InstanceListItem {
+    const runtime = this.resolveRuntime(r, maps);
     const base = r.project?.serverUrl?.trim();
     const previewUrl =
       base && r.branchSlug
@@ -294,12 +335,16 @@ export class PreviewInstancesService {
       branch: r.branch,
       branchSlug: r.branchSlug,
       pm2Name: r.pm2Name,
+      runtimeName: r.pm2Name,
+      runner: r.runner ?? 'pm2',
       port: r.port,
       status: r.status,
-      pm2Online,
-      active: pm2Online,
-      pm2Status: pm2?.status ?? null,
-      monit: pm2?.monit ?? null,
+      runtimeOnline: runtime.online,
+      runtimeStatus: runtime.status,
+      pm2Online: runtime.online,
+      active: runtime.online,
+      pm2Status: runtime.status,
+      monit: runtime.monit ?? null,
       previewUrl,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
@@ -307,25 +352,16 @@ export class PreviewInstancesService {
   }
 
   async findAllForApi(
-    pm2ByName: Map<
-      string,
-      { status: string | null; monit?: { memory?: number; cpu?: number } }
-    >,
+    maps: RuntimeMaps,
   ): Promise<InstanceListItem[]> {
     const rows = await this.repo.find({
       relations: ['project'],
       order: { updatedAt: 'DESC' },
     });
-    return rows.map((r) => this.buildListItem(r, pm2ByName.get(r.pm2Name)));
+    return rows.map((r) => this.buildListItem(r, maps));
   }
 
-  async findOneForApi(
-    id: string,
-    pm2ByName: Map<
-      string,
-      { status: string | null; monit?: { memory?: number; cpu?: number } }
-    >,
-  ): Promise<InstanceListItem> {
+  async findOneForApi(id: string, maps: RuntimeMaps): Promise<InstanceListItem> {
     const r = await this.repo.findOne({
       where: { id },
       relations: ['project'],
@@ -333,7 +369,7 @@ export class PreviewInstancesService {
     if (!r) {
       throw new NotFoundException(`Instância "${id}" não encontrada`);
     }
-    return this.buildListItem(r, pm2ByName.get(r.pm2Name));
+    return this.buildListItem(r, maps);
   }
 
   async findEntityById(id: string): Promise<PreviewInstance | null> {
@@ -352,9 +388,9 @@ export class PreviewInstancesService {
     await runCorePauseScript(this.config, row.project.slug, row.branch);
     await this.setStatus(row, 'paused');
     await this.processWaitingQueue();
-    const pm2 = await fetchPm2ByName(this.config);
+    const maps = await this.fetchRuntimeMaps();
     const fresh = await this.repo.findOne({ where: { id }, relations: ['project'] });
-    return this.buildListItem(fresh as PreviewInstance, pm2.get(fresh!.pm2Name));
+    return this.buildListItem(fresh as PreviewInstance, maps);
   }
 
   async activateOrRedeployInstance(id: string): Promise<InstanceListItem> {
@@ -387,12 +423,12 @@ export class PreviewInstancesService {
       const active = await this.countActiveSlots();
       if (active >= max) {
         await this.setStatus(row, 'waiting');
-        const pm2 = await fetchPm2ByName(this.config);
+        const maps = await this.fetchRuntimeMaps();
         const fresh = await this.repo.findOne({
           where: { id },
           relations: ['project'],
         });
-        return this.buildListItem(fresh as PreviewInstance, pm2.get(fresh!.pm2Name));
+        return this.buildListItem(fresh as PreviewInstance, maps);
       }
       await this.setStatus(row, 'deploying');
       try {
@@ -413,9 +449,9 @@ export class PreviewInstancesService {
         `Estado "${row.status}" não suporta ativação forçada agora`,
       );
     }
-    const pm2 = await fetchPm2ByName(this.config);
+    const maps = await this.fetchRuntimeMaps();
     const fresh = await this.repo.findOne({ where: { id }, relations: ['project'] });
-    return this.buildListItem(fresh as PreviewInstance, pm2.get(fresh!.pm2Name));
+    return this.buildListItem(fresh as PreviewInstance, maps);
   }
 
   async findAllByProjectId(projectId: string): Promise<PreviewInstance[]> {

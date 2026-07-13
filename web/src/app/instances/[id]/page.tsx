@@ -13,7 +13,7 @@ import {
   pauseInstance,
   removeInstance,
 } from './::handlers/detail';
-import type { InstanceRow } from '../::handlers/instances';
+import { runnerLabel, type InstanceRow } from '../::handlers/instances';
 
 export default function InstanceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -154,7 +154,7 @@ export default function InstanceDetailPage() {
                   onClick={async () => {
                     if (
                       !confirm(
-                        `Remove this instance?\n\nProject: ${row.projectSlug}\nBranch: ${row.branch}\n\nThis stops the runtime (PM2/nginx) and deletes the database record.`,
+                        `Remove this instance?\n\nProject: ${row.projectSlug}\nBranch: ${row.branch}\n\nThis stops the runtime (${runnerLabel(row.runner)}/nginx) and deletes the database record.`,
                       )
                     ) {
                       return;
@@ -184,8 +184,12 @@ export default function InstanceDetailPage() {
                   <dd className="font-mono text-white/90">{row.status}</dd>
                 </div>
                 <div>
-                  <dt className="text-white/55">PM2</dt>
-                  <dd className="font-mono text-white/90">{row.pm2Name}</dd>
+                  <dt className="text-white/55">Runner</dt>
+                  <dd className="font-mono text-white/90">{runnerLabel(row.runner)}</dd>
+                </div>
+                <div>
+                  <dt className="text-white/55">{runnerLabel(row.runner)} name</dt>
+                  <dd className="font-mono text-white/90">{row.runtimeName ?? row.pm2Name}</dd>
                 </div>
                 <div>
                   <dt className="text-white/55">Port</dt>
@@ -196,14 +200,16 @@ export default function InstanceDetailPage() {
                   <dd className="font-mono text-white/90">{row.branchSlug}</dd>
                 </div>
                 <div>
-                  <dt className="text-white/55">PM2 online</dt>
+                  <dt className="text-white/55">{runnerLabel(row.runner)} online</dt>
                   <dd className="text-white/90">
-                    {row.pm2Online ? (
+                    {(row.runtimeOnline ?? row.pm2Online) ? (
                       <span className="text-emerald-200/90">yes</span>
                     ) : (
                       <span className="text-amber-200/90">no</span>
                     )}{' '}
-                    <span className="text-white/55">({row.pm2Status ?? '—'})</span>
+                    <span className="text-white/55">
+                      ({row.runtimeStatus ?? row.pm2Status ?? '—'})
+                    </span>
                   </dd>
                 </div>
                 <div>
@@ -230,12 +236,18 @@ export default function InstanceDetailPage() {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-white/55">CPU / memory (PM2)</dt>
+                  <dt className="text-white/55">CPU / memory ({runnerLabel(row.runner)})</dt>
                   <dd className="text-white/80">
-                    {typeof row.monit?.cpu === 'number' ? `${row.monit.cpu}%` : '—'} ·{' '}
-                    {typeof row.monit?.memory === 'number'
-                      ? `${Math.round(row.monit.memory / (1024 * 1024))} MB`
-                      : '—'}
+                    {row.runner === 'docker' ? (
+                      <span className="text-white/55">n/d (docker)</span>
+                    ) : (
+                      <>
+                        {typeof row.monit?.cpu === 'number' ? `${row.monit.cpu}%` : '—'} ·{' '}
+                        {typeof row.monit?.memory === 'number'
+                          ? `${Math.round(row.monit.memory / (1024 * 1024))} MB`
+                          : '—'}
+                      </>
+                    )}
                   </dd>
                 </div>
                 <div>
@@ -250,9 +262,10 @@ export default function InstanceDetailPage() {
             <div className="card p-5">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-bold">Logs (PM2)</h2>
+                  <h2 className="text-base font-bold">Logs ({runnerLabel(row.runner)})</h2>
                   <p className="mt-0.5 text-xs text-white/55">
-                    Last lines from process <span className="font-mono">{row.pm2Name}</span>
+                    Last lines from {row.runner === 'docker' ? 'container' : 'process'}{' '}
+                    <span className="font-mono">{row.runtimeName ?? row.pm2Name}</span>
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
