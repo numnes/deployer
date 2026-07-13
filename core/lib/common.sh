@@ -69,9 +69,9 @@ next_free_port() {
 location_file_basename() {
   local project_slug="$1"
   local branch_slug="$2"
-  # O path público deve ser só /<branchSlug>/.
-  # O PM2 name já inclui o project slug; manter o nginx path simples.
-  echo "${branch_slug}.location"
+  # Path público e arquivo de location usam <projectSlug>-<branchSlug> para
+  # evitar colisões entre projetos diferentes com branches de mesmo nome.
+  echo "${project_slug}-${branch_slug}.location"
 }
 
 nginx_reload() {

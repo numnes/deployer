@@ -69,7 +69,7 @@ deployer setup nginx --help`}
                 project</strong> (e.g. <code className="text-xs">https://preview.example.com</code>
                 ). Each project can use its own host; configure nginx separately per domain or
                 subdomain. Branch paths are at{' '}
-                <code className="text-xs">{'{URL}/{branch-slug}/'}</code>.
+                <code className="text-xs">{'{URL}/{project-slug}-{branch-slug}/'}</code>.
               </p>
               <p className="mt-2 text-[#8b919a]">
                 Bulk actions on the same page: teardown all instances, restart all instances, or

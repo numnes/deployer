@@ -350,8 +350,8 @@ export class PreviewInstancesService {
     const runtime = this.resolveRuntime(r, maps);
     const base = r.project?.serverUrl?.trim();
     const previewUrl =
-      base && r.branchSlug
-        ? `${base.replace(/\/+$/, '')}/${r.branchSlug}/`
+      base && r.pm2Name
+        ? `${base.replace(/\/+$/, '')}/${r.pm2Name}/`
         : null;
     const project = r.project;
     const activeExpiresAt =

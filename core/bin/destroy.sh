@@ -18,7 +18,8 @@ BRANCH_SLUG="$(sanitize_branch_slug "$BRANCH")"
 NAME="$(instance_name "$PROJECT_SLUG" "$BRANCH")"
 LOCATIONS_DIR="${DEPLOYER_LOCATIONS_DIR}"
 LOC_FILE="${LOCATIONS_DIR}/$(location_file_basename "$PROJECT_SLUG" "$BRANCH_SLUG")"
-LEGACY_LOC_FILE="${LOCATIONS_DIR}/${PROJECT_SLUG}-${BRANCH_SLUG}.location"
+# Formato antigo (apenas branchSlug), removido para compatibilidade.
+LEGACY_LOC_FILE="${LOCATIONS_DIR}/${BRANCH_SLUG}.location"
 TARGET_DIR="${DEPLOYER_WORK_ROOT}/${PROJECT_SLUG}/${BRANCH_SLUG}"
 
 stop_instance "$NAME"

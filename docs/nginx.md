@@ -1,6 +1,6 @@
 # Configure nginx
 
-Preview URLs are served by **nginx on the deployer host**. The core writes one `*.location` file per branch under the locations directory (default `~/deployer/locations`). Each file proxies `/{branch-slug}/` to the instance's local port.
+Preview URLs are served by **nginx on the deployer host**. The core writes one `*.location` file per instance under the locations directory (default `~/deployer/locations`). Each file is named `{project-slug}-{branch-slug}.location` and proxies `/{project-slug}-{branch-slug}/` to the instance's local port. Including the project slug in the path avoids collisions between different projects that share a branch name.
 
 **You need a separate nginx `server` block (or equivalent site config) for every domain or subdomain used as a project's public URL.** If two projects use different hosts — e.g. `preview.app-a.example.com` and `preview.app-b.example.com` — configure nginx for **each** host and point the matching **Public URL** in the dashboard to that host.
 
@@ -24,7 +24,7 @@ Preview URLs are served by **nginx on the deployer host**. The core writes one `
 
    It lists configs in `sites-enabled` (or the directory you pass), shows the file with the `include` line added, and tells you to replace the file contents manually (e.g. `sudo nano …`), then run `sudo nginx -t && sudo nginx -s reload`.
 
-4. In the dashboard, set the project **Public URL** to that host (e.g. `https://preview.myapp.example.com`). Branch previews are at `{Public URL}/{branch-slug}/`.
+4. In the dashboard, set the project **Public URL** to that host (e.g. `https://preview.myapp.example.com`). Branch previews are at `{Public URL}/{project-slug}-{branch-slug}/`.
 
 5. After deploys, the core reloads nginx when location files change. After **editing site configs by hand**, test and reload:
 

@@ -8,7 +8,7 @@ Open a PR, trigger a GitHub Action, and get a live **deploy preview** URL. No Ve
 
 Also useful if you search for: **feature-branch environments**, **dynamic environments**, **on-demand test environments**, **PR preview deployments**, or a lightweight **self-hosted alternative** to hosted preview/review-app services.
 
-Each branch gets its own checkout, PM2 process, and nginx route (`/{branch-slug}/`). The dashboard shows active, waiting, paused, and failed instances; a global **slot limit** queues excess deploys until a preview is torn down. Teardown on PR close is supported via workflow.
+Each branch gets its own checkout, PM2 process, and nginx route (`/{project-slug}-{branch-slug}/`). The dashboard shows active, waiting, paused, and failed instances; a global **slot limit** queues excess deploys until a preview is torn down. Teardown on PR close is supported via workflow.
 
 Self-host on a single machine — or aggregate several deployer hosts from one dashboard via **cluster** credentials.
 
@@ -26,7 +26,7 @@ Install these on the machine that will run deployer (the `install.sh` script che
 | **Node.js** (LTS recommended, v18+) | API build, CLI helpers                                                                  | [nodejs.org/en/download](https://nodejs.org/en/download) · [nvm](https://github.com/nvm-sh/nvm)                         |
 | **Docker** + **Compose**            | Postgres, Redis, and web UI containers                                                  | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/)                                                       |
 | **PM2**                             | Runs the deployer API locally; also runs preview instances on the host (default runner) | [pm2.keymetrics.io — Quick start](https://pm2.keymetrics.io/docs/usage/quick-start/) (`npm install -g pm2`)             |
-| **nginx**                           | Reverse proxy for preview URLs (`/{branch-slug}/`)                                      | [nginx.org/en/download](https://nginx.org/en/download.html) · [Ubuntu/Debian](https://nginx.org/en/linux_packages.html) |
+| **nginx**                           | Reverse proxy for preview URLs (`/{project-slug}-{branch-slug}/`)                       | [nginx.org/en/download](https://nginx.org/en/download.html) · [Ubuntu/Debian](https://nginx.org/en/linux_packages.html) |
 
 If PM2 is not installed globally, `deployer setup` falls back to `npx pm2` for the API only. For production preview deploys with the **PM2 runner**, install PM2 on the host.
 

@@ -4,7 +4,7 @@
 
 Ephemeral **preview URLs** for code review and QA before merge:
 
-- **One URL per branch / PR** — e.g. `https://preview.example.com/feature-xyz/`
+- **One URL per branch / PR** — e.g. `https://preview.example.com/my-app-feature-xyz/`
 - **Environment queue** — when the active slot limit is reached, new deploys stay `waiting` until a preview is paused or destroyed
 - **Pause / resume / redeploy** — per instance in the dashboard, or **Restart all instances** on a project
 - **Teardown on PR close** — optional workflow removes the instance automatically

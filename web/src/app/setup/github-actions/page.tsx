@@ -136,7 +136,7 @@ export default function SetupGithubActionsPage() {
                   <strong className="text-[#e8eaed]">serverUrl</strong> — optional; the public
                   domain configured in nginx where preview instances are available (e.g.{' '}
                   <code className="text-xs">https://preview.example.com</code>). Each branch is
-                  served at <code className="text-xs">{'{URL}/{branch-slug}/'}</code>
+                  served at <code className="text-xs">{'{URL}/{project-slug}-{branch-slug}/'}</code>
                 </li>
               </ul>
               <p className="mt-3">Import the JSON in the dashboard:</p>
@@ -199,7 +199,7 @@ export default function SetupGithubActionsPage() {
                 </li>
                 <li>API queues the job; core clones, builds, and starts PM2</li>
                 <li>
-                  Preview at {'{project URL}'}/{'{branch-slug}'}/
+                  Preview at {'{project URL}'}/{'{project-slug}-{branch-slug}'}/
                 </li>
                 <li>
                   On PR close, <code className="text-xs">POST /deploy/destroy</code> removes the
