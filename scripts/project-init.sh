@@ -3,6 +3,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/github-credentials-hint.sh
+source "${ROOT_DIR}/scripts/lib/github-credentials-hint.sh"
 
 TARGET_DIR=""
 FORCE=0
@@ -25,6 +27,9 @@ Environment (non-interactive):
   DEPLOYER_PROJECT_SLUG       Project slug
   DEPLOYER_PROJECT_GIT_URL    Git remote URL
   DEPLOYER_PROJECT_SERVER_URL Optional public URL (nginx domain)
+  DEPLOYER_RUNNER             pm2 | docker
+  DEPLOYER_DOCKER_BUILD       local | remote (when runner=docker)
+  DEPLOYER_REGISTRY           Container registry host (default: ghcr.io)
 
 Examples:
   deployer project init
@@ -108,6 +113,70 @@ collect_project_metadata() {
   fi
 }
 
+derive_registry_image() {
+  local git_url="$1"
+  REGISTRY="${DEPLOYER_REGISTRY:-ghcr.io}"
+  if [[ "$git_url" =~ github\.com[:/]+([^/]+)/([^/.]+) ]]; then
+    local owner="${BASH_REMATCH[1]}"
+    local repo
+    repo="$(echo "${BASH_REMATCH[2]}" | tr '[:upper:]' '[:lower:]')"
+    IMAGE_NAME="${owner}/${repo}"
+  else
+    IMAGE_NAME="${PROJECT_SLUG}"
+  fi
+}
+
+collect_runner_config() {
+  echo ""
+  log "Runtime runner"
+  echo "  1) pm2  — build and run Node (or similar) directly on the root server"
+  echo "  2) docker — run the app in containers"
+
+  if [[ -n "${DEPLOYER_RUNNER:-}" ]]; then
+    RUNNER="$DEPLOYER_RUNNER"
+    echo "  runner: ${RUNNER} (DEPLOYER_RUNNER)"
+  else
+    local choice
+    while true; do
+      read -r -p "Choose runner [1=pm2, 2=docker] (default 1): " choice
+      choice="${choice:-1}"
+      case "$choice" in
+        1|pm2) RUNNER="pm2"; break ;;
+        2|docker) RUNNER="docker"; break ;;
+        *) echo "Enter 1, 2, pm2, or docker." >&2 ;;
+      esac
+    done
+  fi
+
+  DOCKER_BUILD=""
+  if [[ "$RUNNER" == "docker" ]]; then
+    echo ""
+    echo "Docker image build location:"
+    echo "  1) GitHub Actions (remote) — build and push to a registry in CI;"
+    echo "     saves CPU on the root server but uses Actions minutes and requires"
+    echo "     an external registry (e.g. GHCR). The workflow sends the image ref to deployer."
+    echo "  2) Root server (local) — clone repo and docker build on the root machine;"
+    echo "     no external registry needed, but builds consume root server resources."
+
+    if [[ -n "${DEPLOYER_DOCKER_BUILD:-}" ]]; then
+      DOCKER_BUILD="$DEPLOYER_DOCKER_BUILD"
+      echo "  docker build: ${DOCKER_BUILD} (DEPLOYER_DOCKER_BUILD)"
+    else
+      local choice
+      while true; do
+        read -r -p "Choose build mode [1=remote/GitHub, 2=local/root] (default 2): " choice
+        choice="${choice:-2}"
+        case "$choice" in
+          1|remote) DOCKER_BUILD="remote"; break ;;
+          2|local) DOCKER_BUILD="local"; break ;;
+          *) echo "Enter 1, 2, remote, or local." >&2 ;;
+        esac
+      done
+    fi
+    derive_registry_image "$PROJECT_GIT_URL"
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -f|--force) FORCE=1; shift ;;
@@ -130,14 +199,6 @@ TARGET_DIR="$(cd "${TARGET_DIR:-.}" && pwd)"
 WORKFLOWS_DIR="${TARGET_DIR}/.github/workflows"
 DEPLOYER_YAML="${TARGET_DIR}/deployer.yaml"
 
-SRC_DEPLOY="${ROOT_DIR}/actions/deploy-preview.yml"
-SRC_TEARDOWN="${ROOT_DIR}/actions/teardown-preview.yml"
-SRC_CONFIG="${ROOT_DIR}/examples/deployer.yaml"
-
-[[ -f "$SRC_DEPLOY" ]] || die "Template not found: $SRC_DEPLOY"
-[[ -f "$SRC_TEARDOWN" ]] || die "Template not found: $SRC_TEARDOWN"
-[[ -f "$SRC_CONFIG" ]] || die "Template not found: $SRC_CONFIG"
-
 if [[ ! -d "$TARGET_DIR" ]]; then
   die "Directory does not exist: $TARGET_DIR"
 fi
@@ -149,6 +210,23 @@ else
 fi
 
 collect_project_metadata
+collect_runner_config
+
+if [[ "$RUNNER" == "docker" && "$DOCKER_BUILD" == "remote" ]]; then
+  SRC_DEPLOY="${ROOT_DIR}/actions/deploy-preview-docker-remote.yml"
+  SRC_CONFIG="${ROOT_DIR}/examples/deployer.docker-remote.yaml"
+elif [[ "$RUNNER" == "docker" ]]; then
+  SRC_DEPLOY="${ROOT_DIR}/actions/deploy-preview-docker-local.yml"
+  SRC_CONFIG="${ROOT_DIR}/examples/deployer.docker-local.yaml"
+else
+  SRC_DEPLOY="${ROOT_DIR}/actions/deploy-preview.yml"
+  SRC_CONFIG="${ROOT_DIR}/examples/deployer.pm2.yaml"
+fi
+SRC_TEARDOWN="${ROOT_DIR}/actions/teardown-preview.yml"
+
+[[ -f "$SRC_DEPLOY" ]] || die "Template not found: $SRC_DEPLOY"
+[[ -f "$SRC_TEARDOWN" ]] || die "Template not found: $SRC_TEARDOWN"
+[[ -f "$SRC_CONFIG" ]] || die "Template not found: $SRC_CONFIG"
 
 write_file() {
   local dest="$1"
@@ -215,6 +293,23 @@ apply_project_slug() {
   log "set project slug in ${file#"$TARGET_DIR"/}"
 }
 
+apply_registry_placeholders() {
+  local file="$1"
+  if [[ ! -f "$file" ]]; then
+    return
+  fi
+  if ! grep -q '__DEPLOYER_REGISTRY__\|__DEPLOYER_IMAGE_NAME__' "$file"; then
+    return
+  fi
+  local tmp="${file}.tmp.$$"
+  sed \
+    -e "s/__DEPLOYER_REGISTRY__/${REGISTRY}/g" \
+    -e "s/__DEPLOYER_IMAGE_NAME__/${IMAGE_NAME}/g" \
+    "$file" > "$tmp"
+  mv "$tmp" "$file"
+  log "set registry/image in ${file#"$TARGET_DIR"/}"
+}
+
 
 mkdir -p "$WORKFLOWS_DIR"
 
@@ -238,6 +333,7 @@ for wf in "${WORKFLOWS_DIR}/deploy-preview.yml" "${WORKFLOWS_DIR}/teardown-previ
   if [[ -f "$wf" ]]; then
     apply_branches "$wf"
     apply_project_slug "$wf"
+    apply_registry_placeholders "$wf"
   fi
 done
 
@@ -249,9 +345,21 @@ echo "Next steps:"
 echo "  1. Register the project in the deployer dashboard (see registration JSON below)"
 echo "  2. Create an API key (Users → API Keys)"
 echo "  3. In the app repo GitHub settings, add secrets DEPLOYER_API_URL and DEPLOYER_API_KEY"
-echo "  4. Adjust deployer.yaml (build steps and PM2 target) for your stack"
+if [[ "$RUNNER" == "pm2" ]]; then
+  echo "  4. Adjust deployer.yaml (build steps and PM2 target) for your stack"
+elif [[ "$DOCKER_BUILD" == "local" ]]; then
+  echo "  4. Add a Dockerfile and adjust deployer.yaml (port, dockerfile) for your stack"
+else
+  echo "  4. Add a Dockerfile; the workflow builds and pushes to ${REGISTRY}/${IMAGE_NAME}"
+fi
 echo "  5. Commit and push .github/workflows/ and deployer.yaml"
 echo ""
+echo "Runner: ${RUNNER}$([ "$RUNNER" == "docker" ] && echo " (build: ${DOCKER_BUILD})")"
+echo ""
+print_github_credentials_hint
+if [[ "$RUNNER" == "docker" && "$DOCKER_BUILD" == "remote" ]]; then
+  print_registry_setup_hint "$REGISTRY" "$IMAGE_NAME"
+fi
 echo "Docs: dashboard → Setup → GitHub Actions"
 echo ""
 echo "=== Registration JSON (import in Projects → Add project) ==="

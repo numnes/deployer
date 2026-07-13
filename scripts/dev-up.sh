@@ -136,3 +136,7 @@ echo ""
 api_code="$(wait_for_http "http://localhost:${API_PORT}/docs" "API" || true)"
 web_code="$(wait_for_http "http://localhost:${WEB_PUBLISH_PORT}/" "Web" || true)"
 echo "[dev-up] Health check: API /docs=${api_code}, Web=${web_code}"
+
+# shellcheck source=lib/github-credentials-hint.sh
+source "${ROOT_DIR}/scripts/lib/github-credentials-hint.sh"
+print_github_credentials_hint

@@ -4,4 +4,5 @@ export type DeployMeta = {
   branchSlug: string;
   pm2Name: string;
   port: number;
+  runner?: 'pm2' | 'docker';
 };

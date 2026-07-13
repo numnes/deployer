@@ -14,6 +14,7 @@ export type DeployJobPayload = {
   projectSlug: string;
   branch: string;
   gitUrl?: string;
+  image?: string;
 };
 
 @Processor('deploy')
@@ -64,6 +65,7 @@ export class DeployProcessor extends WorkerHost {
         job.data.projectSlug,
         job.data.gitUrl as string,
         job.data.branch,
+        job.data.image,
       );
       await this.previewInstances.finalizeDeploySuccess(meta);
     } catch (e) {

@@ -1,0 +1,7 @@
+# Runner Docker — imagem construída no GitHub Actions e enviada a um registry.
+# O workflow deve enviar o campo "image" no POST /deploy.
+runner: docker
+
+docker:
+  build: remote
+  port: 3000

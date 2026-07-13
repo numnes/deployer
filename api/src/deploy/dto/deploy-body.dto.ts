@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString, MinLength } from 'class-validator';
 
 export class DeployBodyDto {
   @ApiProperty({ example: 'project-slug' })
@@ -11,4 +11,14 @@ export class DeployBodyDto {
   @IsString()
   @MinLength(1)
   branch: string;
+
+  @ApiPropertyOptional({
+    example: 'ghcr.io/org/app:preview-feature-abc123',
+    description:
+      'Imagem pré-buildada (obrigatória para runner docker com build remote)',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  image?: string;
 }

@@ -173,6 +173,7 @@ export class PreviewInstancesService {
     row.branchSlug = meta.branchSlug;
     row.pm2Name = meta.pm2Name;
     row.port = meta.port;
+    row.runner = meta.runner ?? 'pm2';
     await this.repo.save(row);
     await this.setStatus(row, 'active');
     return (await this.repo.findOne({ where: { id: row.id } })) as PreviewInstance;

@@ -13,6 +13,7 @@ export async function runCoreDeployScript(
   projectSlug: string,
   gitUrl: string,
   branch: string,
+  image?: string,
 ): Promise<DeployMeta> {
   const coreDir =
     config.get<string>('DEPLOYER_CORE_DIR') ||
@@ -22,7 +23,10 @@ export async function runCoreDeployScript(
     throw new Error('DEPLOYER_WORK_ROOT não configurado');
   }
   const binDir = join(coreDir, 'bin');
-  const env = { ...process.env, DEPLOYER_WORK_ROOT: workRoot };
+  const env: NodeJS.ProcessEnv = { ...process.env, DEPLOYER_WORK_ROOT: workRoot };
+  if (image) {
+    env.DEPLOYER_IMAGE = image;
+  }
   const script = join(binDir, 'deploy.sh');
   await execFileAsync(script, [projectSlug, gitUrl, branch], { env });
   const pm2Name = pm2AppName(projectSlug, branch);

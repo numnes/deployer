@@ -14,12 +14,13 @@ export class DeployService {
   ) {}
 
   async enqueueDeploy(data: DeployBodyDto) {
-    const { project, branch } = data;
+    const { project, branch, image } = data;
     const projectDocument = await this.projects.getBySlug(project);
     const job = await this.deployQueue.add('create', {
       projectSlug: project,
       branch,
       gitUrl: projectDocument.gitUrl,
+      image,
     });
     return { status: 'completed', jobId: String(job.id) };
   }

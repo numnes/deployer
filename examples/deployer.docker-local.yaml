@@ -1,0 +1,9 @@
+# Runner Docker — imagem construída na máquina root (sem registry externo).
+runner: docker
+
+docker:
+  build: local
+  dockerfile: Dockerfile
+  context: .
+  port: 3000
+  imageName: app

@@ -1,0 +1,9 @@
+# Runner PM2 — build e start no host (sem Docker para a aplicação).
+runner: pm2
+
+build:
+  - npm ci
+  - npm run build
+
+# Caminho relativo à raiz do repositório para o pm2 start.
+target: dist/main.js

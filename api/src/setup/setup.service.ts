@@ -171,8 +171,13 @@ export class SetupService {
     const root = this.repoRoot();
     const specs = [
       { path: '.github/workflows/deploy-preview.yml', src: join(root, 'actions', 'deploy-preview.yml') },
+      { path: '.github/workflows/deploy-preview-docker-local.yml', src: join(root, 'actions', 'deploy-preview-docker-local.yml') },
+      { path: '.github/workflows/deploy-preview-docker-remote.yml', src: join(root, 'actions', 'deploy-preview-docker-remote.yml') },
       { path: '.github/workflows/teardown-preview.yml', src: join(root, 'actions', 'teardown-preview.yml') },
       { path: 'deployer.yaml', src: join(root, 'examples', 'deployer.yaml') },
+      { path: 'deployer.pm2.yaml', src: join(root, 'examples', 'deployer.pm2.yaml') },
+      { path: 'deployer.docker-local.yaml', src: join(root, 'examples', 'deployer.docker-local.yaml') },
+      { path: 'deployer.docker-remote.yaml', src: join(root, 'examples', 'deployer.docker-remote.yaml') },
     ];
 
     const files: ProjectTemplateFile[] = [];

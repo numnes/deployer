@@ -14,10 +14,42 @@ sanitize_branch_slug() {
   echo "$b" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9._-]/-/g' | sed 's/^-*//;s/-*$//'
 }
 
-pm2_app_name() {
+instance_name() {
   local project="$1"
   local branch="$2"
   echo "${project}-$(sanitize_branch_slug "$branch")"
+}
+
+pm2_app_name() {
+  instance_name "$@"
+}
+
+read_instance_runner() {
+  local name="$1"
+  local runner_file="${DEPLOYER_STATE_DIR}/${name}.runner"
+  if [[ -f "$runner_file" ]]; then
+    cat "$runner_file"
+    return 0
+  fi
+  echo "pm2"
+}
+
+write_instance_runner() {
+  local name="$1"
+  local runner="$2"
+  echo "$runner" >"${DEPLOYER_STATE_DIR}/${name}.runner"
+}
+
+stop_instance() {
+  local name="$1"
+  local runner
+  runner="$(read_instance_runner "$name")"
+  if [[ "$runner" == "docker" ]]; then
+    docker stop "$name" 2>/dev/null || true
+    docker rm "$name" 2>/dev/null || true
+  else
+    pm2 delete "$name" 2>/dev/null || true
+  fi
 }
 
 next_free_port() {
@@ -83,15 +115,28 @@ path = sys.argv[1]
 with open(path) as f:
     d = yaml.safe_load(f) or {}
 runner = d.get("runner") or "pm2"
-build = d.get("build") or []
-if isinstance(build, str):
-    build = [build]
-target = d.get("target")
-if not target:
-    raise SystemExit("deployer.yaml: campo 'target' é obrigatório")
 print(runner)
-print(target)
-for c in build:
-    print("BUILD:" + c)
+if runner == "docker":
+    docker = d.get("docker") or {}
+    build_mode = docker.get("build") or "local"
+    dockerfile = docker.get("dockerfile") or "Dockerfile"
+    context = docker.get("context") or "."
+    port = docker.get("port") or 3000
+    image_name = docker.get("imageName") or "app"
+    print(f"DOCKER_BUILD:{build_mode}")
+    print(f"DOCKERFILE:{dockerfile}")
+    print(f"CONTEXT:{context}")
+    print(f"DOCKER_PORT:{port}")
+    print(f"IMAGE_NAME:{image_name}")
+else:
+    build = d.get("build") or []
+    if isinstance(build, str):
+        build = [build]
+    target = d.get("target")
+    if not target:
+        raise SystemExit("deployer.yaml: campo 'target' é obrigatório para runner pm2")
+    print(target)
+    for c in build:
+        print("BUILD:" + c)
 PY
 }

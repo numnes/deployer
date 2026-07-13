@@ -15,15 +15,16 @@ usage() {
 PROJECT_SLUG="$1"
 BRANCH="$2"
 BRANCH_SLUG="$(sanitize_branch_slug "$BRANCH")"
-NAME="$(pm2_app_name "$PROJECT_SLUG" "$BRANCH")"
+NAME="$(instance_name "$PROJECT_SLUG" "$BRANCH")"
 LOCATIONS_DIR="${DEPLOYER_LOCATIONS_DIR}"
 LOC_FILE="${LOCATIONS_DIR}/$(location_file_basename "$PROJECT_SLUG" "$BRANCH_SLUG")"
 LEGACY_LOC_FILE="${LOCATIONS_DIR}/${PROJECT_SLUG}-${BRANCH_SLUG}.location"
 TARGET_DIR="${DEPLOYER_WORK_ROOT}/${PROJECT_SLUG}/${BRANCH_SLUG}"
 
-pm2 delete "$NAME" 2>/dev/null || true
+stop_instance "$NAME"
 rm -f "${DEPLOYER_STATE_DIR}/${NAME}.port"
 rm -f "${DEPLOYER_STATE_DIR}/${NAME}.deploy-result.json"
+rm -f "${DEPLOYER_STATE_DIR}/${NAME}.runner"
 rm -f "$LOC_FILE"
 rm -f "$LEGACY_LOC_FILE"
 rm -rf "$TARGET_DIR"

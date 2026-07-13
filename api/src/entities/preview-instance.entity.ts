@@ -35,6 +35,10 @@ export class PreviewInstance {
   @Column({ name: 'pm2_name', type: 'varchar' })
   pm2Name: string;
 
+  /** pm2 | docker */
+  @Column({ type: 'varchar', length: 16, default: 'pm2' })
+  runner: string;
+
   /** waiting | deploying | active | paused | error — default para linhas legadas. */
   @Column({ type: 'varchar', length: 24, default: 'active' })
   status: string;

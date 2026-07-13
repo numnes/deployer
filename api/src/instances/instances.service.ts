@@ -60,10 +60,23 @@ export class InstancesService {
       return {
         pm2Name: name,
         lines: safeLines,
-        output: `Sem processo no PM2 para esta instância (status: ${row.status}). Use “Ativar / redeploy” na página da instância quando houver vaga.`,
+        output: `Sem processo ativo para esta instância (status: ${row.status}). Use “Ativar / redeploy” na página da instância quando houver vaga.`,
       };
     }
     try {
+      if (row.runner === 'docker') {
+        const { stdout, stderr } = await execFileAsync(
+          'docker',
+          ['logs', '--tail', String(safeLines), name],
+          {
+            maxBuffer: 10 * 1024 * 1024,
+            env: { ...process.env },
+          },
+        );
+        const out = [stdout, stderr].filter(Boolean).join('\n');
+        return { pm2Name: name, lines: safeLines, output: out || '(sem saída)' };
+      }
+
       const { stdout, stderr } = await execFileAsync(
         'pm2',
         ['logs', name, '--lines', String(safeLines), '--nostream'],
@@ -76,11 +89,12 @@ export class InstancesService {
       return { pm2Name: name, lines: safeLines, output: out || '(sem saída)' };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      this.log.warn(`pm2 logs ${name}: ${msg}`);
+      const backend = row.runner === 'docker' ? 'Docker' : 'PM2';
+      this.log.warn(`${backend} logs ${name}: ${msg}`);
       return {
         pm2Name: name,
         lines: safeLines,
-        output: `Não foi possível obter logs do PM2.\n${msg}`,
+        output: `Não foi possível obter logs do ${backend}.\n${msg}`,
       };
     }
   }
