@@ -28,7 +28,10 @@ export async function runCoreDeployScript(
     env.DEPLOYER_IMAGE = image;
   }
   const script = join(binDir, 'deploy.sh');
-  await execFileAsync(script, [projectSlug, gitUrl, branch], { env });
+  await execFileAsync(script, [projectSlug, gitUrl, branch], {
+    env,
+    maxBuffer: 10 * 1024 * 1024,
+  });
   const pm2Name = pm2AppName(projectSlug, branch);
   const metaPath = join(workRoot, '.deployer-state', `${pm2Name}.deploy-result.json`);
   const raw = await readFile(metaPath, 'utf8');

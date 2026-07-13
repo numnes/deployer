@@ -95,6 +95,19 @@ export default function InstanceDetailPage() {
               }
             />
 
+            {row.status === 'error' && row.lastDeployError ? (
+              <div className="rounded-xl border border-rose-400/30 bg-rose-950/40 p-4">
+                <h2 className="text-sm font-semibold text-rose-100">Deploy failed</h2>
+                <p className="mt-1 text-xs text-rose-200/70">
+                  Last error recorded during deploy (branch{' '}
+                  <span className="font-mono">{row.branch}</span>).
+                </p>
+                <pre className="mt-3 max-h-64 overflow-auto rounded-lg border border-rose-400/20 bg-black/40 p-3 font-mono text-xs leading-relaxed text-rose-50/90 whitespace-pre-wrap">
+                  {row.lastDeployError}
+                </pre>
+              </div>
+            ) : null}
+
             <div className="card p-5">
               <div className="flex flex-wrap gap-2">
                 <button

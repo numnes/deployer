@@ -22,6 +22,7 @@ export type InstanceRow = {
   pm2Status: string | null;
   monit?: { memory?: number; cpu?: number } | null;
   previewUrl: string | null;
+  lastDeployError: string | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -250,6 +250,14 @@ function InstancesPageContent() {
                   <span className="rounded-md bg-white/10 px-2 py-0.5 font-mono text-xs">
                     {i.status}
                   </span>
+                  {i.status === 'error' && i.lastDeployError ? (
+                    <p
+                      className="mt-1 max-w-xs truncate font-mono text-xs text-rose-200/80"
+                      title={i.lastDeployError}
+                    >
+                      {i.lastDeployError.split('\n')[0]}
+                    </p>
+                  ) : null}
                 </td>
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
                   {(i.runtimeOnline ?? i.pm2Online) ? (

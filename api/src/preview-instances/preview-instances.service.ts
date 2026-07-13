@@ -13,6 +13,7 @@ import { promisify } from 'util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { DeployMeta } from '../deploy/deploy-meta';
+import { formatDeployError } from '../deploy/format-deploy-error';
 import { runCoreDeployScript, runCorePauseScript } from '../deploy/deploy-exec.helper';
 import { pm2AppName, sanitizeBranchSlug } from '../deploy/pm2-name.util';
 import { PreviewInstance } from '../entities/preview-instance.entity';
@@ -64,6 +65,8 @@ export type InstanceListItem = {
   pm2Status: string | null;
   monit?: { memory?: number; cpu?: number } | null;
   previewUrl: string | null;
+  /** Mensagem do último deploy com falha (status error). */
+  lastDeployError: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -171,12 +174,14 @@ export class PreviewInstancesService {
         pm2Name,
         port: null,
         status: 'deploying',
+        lastDeployError: null,
       });
       await this.repo.save(row);
       await this.appendEvent(row.id, null, 'deploying');
     } else {
       row.branchSlug = branchSlug;
       row.pm2Name = pm2Name;
+      row.lastDeployError = null;
       await this.repo.save(row);
       await this.setStatus(row, 'deploying');
     }
@@ -195,18 +200,25 @@ export class PreviewInstancesService {
     row.pm2Name = meta.pm2Name;
     row.port = meta.port;
     row.runner = meta.runner ?? 'pm2';
+    row.lastDeployError = null;
     await this.repo.save(row);
     await this.setStatus(row, 'active');
     return (await this.repo.findOne({ where: { id: row.id } })) as PreviewInstance;
   }
 
-  async finalizeDeployError(projectSlug: string, branch: string): Promise<void> {
+  async finalizeDeployError(
+    projectSlug: string,
+    branch: string,
+    deployError: string,
+  ): Promise<void> {
     try {
       const project = await this.projects.getBySlug(projectSlug);
       const row = await this.repo.findOne({
         where: { projectId: project.id, branch },
       });
       if (row) {
+        row.lastDeployError = deployError;
+        await this.repo.save(row);
         await this.setStatus(row, 'error');
       }
     } catch {
@@ -233,7 +245,7 @@ export class PreviewInstancesService {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         this.log.error(`Fila waiting falhou (${slug}/${next.branch}): ${msg}`);
-        await this.setStatus(next, 'error');
+        await this.finalizeDeployError(slug, next.branch, formatDeployError(e));
       }
     }
   }
@@ -346,6 +358,7 @@ export class PreviewInstancesService {
       pm2Status: runtime.status,
       monit: runtime.monit ?? null,
       previewUrl,
+      lastDeployError: r.lastDeployError,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
     };
@@ -400,6 +413,8 @@ export class PreviewInstancesService {
     });
     if (!row?.project) throw new NotFoundException();
     if (row.status === 'active') {
+      row.lastDeployError = null;
+      await this.repo.save(row);
       await this.setStatus(row, 'deploying');
       try {
         const meta = await runCoreDeployScript(
@@ -410,7 +425,11 @@ export class PreviewInstancesService {
         );
         await this.finalizeDeploySuccess(meta);
       } catch (e) {
-        await this.finalizeDeployError(row.project.slug, row.branch);
+        await this.finalizeDeployError(
+          row.project.slug,
+          row.branch,
+          formatDeployError(e),
+        );
         throw e;
       }
       await this.processWaitingQueue();
@@ -430,6 +449,8 @@ export class PreviewInstancesService {
         });
         return this.buildListItem(fresh as PreviewInstance, maps);
       }
+      row.lastDeployError = null;
+      await this.repo.save(row);
       await this.setStatus(row, 'deploying');
       try {
         const meta = await runCoreDeployScript(
@@ -440,7 +461,11 @@ export class PreviewInstancesService {
         );
         await this.finalizeDeploySuccess(meta);
       } catch (e) {
-        await this.finalizeDeployError(row.project.slug, row.branch);
+        await this.finalizeDeployError(
+          row.project.slug,
+          row.branch,
+          formatDeployError(e),
+        );
         throw e;
       }
       await this.processWaitingQueue();

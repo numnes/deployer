@@ -46,6 +46,10 @@ export class PreviewInstance {
   @Column({ type: 'int', nullable: true })
   port: number | null;
 
+  /** Última mensagem de erro do deploy (quando status = error). */
+  @Column({ name: 'last_deploy_error', type: 'text', nullable: true })
+  lastDeployError: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

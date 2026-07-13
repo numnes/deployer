@@ -7,6 +7,7 @@ import { join } from 'path';
 import { promisify } from 'util';
 import { PreviewInstancesService } from '../preview-instances/preview-instances.service';
 import { runCoreDeployScript } from './deploy-exec.helper';
+import { formatDeployError } from './format-deploy-error';
 
 const execFileAsync = promisify(execFile);
 
@@ -72,6 +73,7 @@ export class DeployProcessor extends WorkerHost {
       await this.previewInstances.finalizeDeployError(
         job.data.projectSlug,
         job.data.branch,
+        formatDeployError(e),
       );
       throw e;
     }
