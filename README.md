@@ -10,11 +10,29 @@ Also useful if you search for: **feature-branch environments**, **dynamic enviro
 
 Each branch gets its own checkout, PM2 process, and nginx route (`/{branch-slug}/`). The dashboard shows active, waiting, paused, and failed instances; a global **slot limit** queues excess deploys until a preview is torn down. Teardown on PR close is supported via workflow.
 
-Self-host on a single machine — no Kubernetes required today.
+Self-host on a single machine — or aggregate several deployer hosts from one dashboard via **cluster** credentials.
 
-> **Coming soon:** runtime backends for **Docker** and **Kubernetes**, so preview environments can run as containers or in a cluster — in addition to the current PM2 + nginx model on a single host.
+> **Coming soon:** **Kubernetes** as a runtime backend for preview instances. **Docker** is already supported per project (`deployer project init`); PM2 remains the default on the host.
 
 ## Quick start
+
+### Prerequisites
+
+Install these on the machine that will run deployer (the `install.sh` script checks **git**, **Node.js**, and **Docker**):
+
+| Dependency | Used for | Install |
+| ---------- | -------- | ------- |
+| **Git** | Clone deployer and app repos | [git-scm.com/downloads](https://git-scm.com/downloads) |
+| **Node.js** (LTS recommended, v18+) | API build, CLI helpers | [nodejs.org/en/download](https://nodejs.org/en/download) · [nvm](https://github.com/nvm-sh/nvm) |
+| **Docker** + **Compose** | Postgres, Redis, and web UI containers | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/) |
+| **PM2** | Runs the deployer API locally; also runs preview instances on the host (default runner) | [pm2.keymetrics.io — Quick start](https://pm2.keymetrics.io/docs/usage/quick-start/) (`npm install -g pm2`) |
+| **nginx** | Reverse proxy for preview URLs (`/{branch-slug}/`) | [nginx.org/en/download](https://nginx.org/en/download.html) · [Ubuntu/Debian](https://nginx.org/en/linux_packages.html) |
+
+If PM2 is not installed globally, `deployer setup` falls back to `npx pm2` for the API only. For production preview deploys with the **PM2 runner**, install PM2 on the host.
+
+nginx is required to serve preview URLs to browsers, but not to start the deployer stack itself. See [Configure nginx](#configure-nginx).
+
+### Install and start
 
 Install the CLI (clones to `~/deployer`, adds `deployer` to `~/.local/bin`):
 
@@ -159,11 +177,11 @@ After `deployer setup`, open the web UI (port shown in `deployer status`, often 
 
 | Area                    | What you can do                                                                                                                                                                       |
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Dashboard**           | Host CPU / memory / disk, instance counts by status (click a status to open **Instances** filtered), active slot usage chart, recent activity                                         |
-| **Projects**            | List projects, **Add project** (manual form or import registration JSON), open **Settings** per project                                                                               |
-| **Projects → Settings** | Set **Public URL** (nginx domain for that project), **Teardown all instances** (pause active), **Restart all instances**, **Delete project** (destroys all instances and the project) |
-| **Instances**           | List all previews; filter by project/branch search and status; open a row for logs and pause/restart/destroy                                                                          |
-| **Settings**            | Global **max active instances** — excess deploys stay `waiting` until a slot frees up                                                                                                 |
+| **Dashboard**           | Host CPU / memory / disk **per connected machine**, aggregated instance counts, active slot usage chart, recent activity with node labels                                          |
+| **Projects**            | List projects (local + remote nodes), **Add project**, open **Settings** per project; **Node** column shows which machine hosts each project                                         |
+| **Projects → Settings** | **Public URL**, per-project **instance lifetime** limits (auto-pause / auto-remove), **Teardown all instances**, **Restart all instances**, **Delete project**                      |
+| **Instances**           | List all previews across nodes; filter by project/branch/status; **Node** column; open a row for logs, pause, activate/redeploy, or remove (remote actions when the cluster key allows) |
+| **Settings**            | Global **max active instances**, **node label** (shown in cluster UI), **cluster credentials** (generate keys) and **connected nodes** (aggregate remote deployers)                   |
 | **Setup**               | Guides for GitHub Actions, secrets, and nginx                                                                                                                                         |
 | **Users → API Keys**    | Create keys used by GitHub Actions (`DEPLOYER_API_KEY`)                                                                                                                               |
 
@@ -174,6 +192,8 @@ Instance status cards on the home dashboard link to `/instances?status=…` with
 | Topic             | Where                                                                            |
 | ----------------- | -------------------------------------------------------------------------------- |
 | Dashboard         | [Dashboard](#dashboard)                                                          |
+| Multi-machine     | [Cluster (multi-machine)](#cluster-multi-machine)                                |
+| Instance lifetime | [Instance lifetime](#instance-lifetime)                                          |
 | Project setup     | [Setup in a project](#setup-in-a-project) · `deployer project init`              |
 | nginx on the host | [Configure nginx](#configure-nginx) · `deployer setup nginx` · **Setup → Nginx** |
 | GitHub Actions    | Dashboard **Setup → GitHub Actions**                                             |
@@ -199,7 +219,20 @@ Ephemeral **preview URLs** for code review and QA before merge:
 - **Pause / resume / redeploy** — per instance in the dashboard, or **Restart all instances** on a project  
 - **Teardown on PR close** — optional workflow removes the instance automatically  
 - **Bulk teardown** — **Projects → Settings → Teardown all instances** pauses every active instance for a project  
-- **Delete project** — removes the project and destroys all its instances (PM2, nginx, database)
+- **Delete project** — removes the project and destroys all its instances (PM2, nginx, database); checkout directory is removed from disk  
+- **Instance lifetime** — optional per-project limits to auto-pause (active time) or auto-remove (total existence); see [Instance lifetime](#instance-lifetime)  
+- **Multi-machine dashboard** — connect other deployer hosts and manage them from one panel; see [Cluster](#cluster-multi-machine)
+
+### Instance lifetime
+
+In **Projects → Settings**, you can set optional limits per project:
+
+| Limit | Effect |
+| ----- | ------ |
+| **Max active lifetime** (days / hours) | While `active`, counts down; when it expires the instance is **paused** (runtime stopped, record kept) |
+| **Max existence lifetime** (days / hours) | From creation; when it expires the instance is **destroyed** (PM2/Docker + nginx + DB record; checkout removed) |
+
+The scheduler runs every minute. The **Instances** list and instance detail page show `activeExpiresAt` and `existenceExpiresAt` when limits apply.
 
 ### Instance states
 
@@ -213,21 +246,56 @@ Preview / ephemeral environment lifecycle:
 | `paused`    | Stopped on the host, still in the database |
 | `error`     | Last deploy or activate failed             |
 
+## Cluster (multi-machine)
+
+Run deployer on **machine A** (hub) and **machine B** (spoke) and manage both from A's dashboard.
+
+### Setup flow
+
+**On machine B** (the node to monitor):
+
+1. **Settings** → set a **Node label** (e.g. `prod-b`)
+2. **Settings → Cluster credentials** → generate a cluster key (`clu_…`, shown once)
+3. Choose permissions:
+   - **Read-only (incl. logs)** — dashboard, projects, instances, and log viewing
+   - **Read & write** — also pause, activate/redeploy, and remove instances from the hub panel
+4. Ensure B's API is reachable from A (LAN or public URL, not only `127.0.0.1`)
+
+**On machine A** (central panel):
+
+1. **Settings → Connected nodes** → add B's **API URL** and paste the `clu_…` key
+2. Click **Test** to verify connectivity and detect the key's permission level
+3. Dashboard, **Projects**, and **Instances** now include data from B, with a **Node** badge per row
+
+### How it works
+
+- Hub-and-spoke over HTTP: A calls B's `/cluster/*` endpoints with header `X-Deployer-Cluster-Key`
+- B enforces the key scope — write actions return `403` on read-only keys even if A tries them
+- Remote instance IDs use the form `r:{nodeId}:{remoteId}` in the hub API
+- Remote node credentials are **encrypted at rest** in A's Postgres with `DEPLOYER_CLUSTER_SECRET` (see [Configuration](#configuration)); decrypted only when making outbound cluster calls
+- Project settings in the hub apply only to **local** projects; remote projects are read-only for configuration
+
+### Limitations
+
+- Cluster keys on B are stored hashed (like API keys); the plaintext `clu_…` is shown once at creation
+- No automatic health polling — use **Test** on a connected node to refresh status and scope
+- Re-adding a node after rotating `DEPLOYER_CLUSTER_SECRET` requires pasting the cluster key again
+
 ## Architecture (short)
 
-Self-hosted **preview environment controller** on a single host — no Kubernetes required:
+Self-hosted **preview environment controller** — single host by default, optional multi-machine aggregation:
 
-- **`core/`** — Bash scripts: clone, build, PM2, nginx locations, pause, destroy  
-- **`api/`** — NestJS API, Postgres, BullMQ/Redis job queue (deploy / teardown webhooks)  
-- **`web/`** — Next.js dashboard (instances, projects, setup guides)  
+- **`core/`** — Bash scripts: clone, build, PM2/Docker, nginx locations, pause, destroy  
+- **`api/`** — NestJS API, Postgres, BullMQ/Redis job queue (deploy / teardown webhooks), cluster fan-out  
+- **`web/`** — Next.js dashboard (instances, projects, cluster settings, setup guides)  
 
 Deploy is triggered with `POST /deploy` (API key), typically from GitHub Actions on pull request open/update. The API queues or runs the core script; closing the PR can call `POST /deploy/destroy` for automatic cleanup.
 
-**Roadmap:** Docker and Kubernetes runtimes for preview instances (coming soon). Today, deploys target the host directly via PM2.
+**Runtimes:** PM2 (default) and Docker per project (`deployer project init`). Kubernetes support is planned.
 
 ## Configuration
 
-Main file: `api/.env` — **generated automatically** on `deployer setup` with Postgres/Redis/API/web ports, a random `JWT_SECRET`, and a random `DEPLOYER_SETUP_KEY`. Connection ports are picked from free local ports when defaults (3000, 3001, 5432, 6480) are in use. Re-running `setup` updates connection settings but keeps an existing `JWT_SECRET` and `DEPLOYER_SETUP_KEY`.
+Main file: `api/.env` — **generated automatically** on `deployer setup` with Postgres/Redis/API/web ports, a random `JWT_SECRET`, `DEPLOYER_SETUP_KEY`, and `DEPLOYER_CLUSTER_SECRET`. Connection ports are picked from free local ports when defaults (3000, 3001, 5432, 6480) are in use. Re-running `setup` updates connection settings but **keeps** existing `JWT_SECRET`, `DEPLOYER_SETUP_KEY`, and `DEPLOYER_CLUSTER_SECRET`.
 
 | Variable                    | Purpose                                                               |
 | --------------------------- | --------------------------------------------------------------------- |
@@ -240,6 +308,7 @@ Main file: `api/.env` — **generated automatically** on `deployer setup` with P
 | `DEPLOYER_LOCATIONS_DIR`    | nginx `*.location` files (default `~/deployer/locations`)             |
 | `JWT_SECRET`                | Auth tokens (auto-generated on first setup)                           |
 | `DEPLOYER_SETUP_KEY`        | Root-only key for privileged bootstrap endpoints (auto-generated)     |
+| `DEPLOYER_CLUSTER_SECRET`   | Encrypts connected-node cluster keys in Postgres (auto-generated; must stay stable across restarts) |
 | `TYPEORM_SYNC`              | `true` for dev schema sync                                            |
 
 ### Privileged endpoints (setup key)
