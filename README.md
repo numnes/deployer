@@ -2,6 +2,9 @@
 
 # deployer | Self-hosted preview & ephemeral environments
 
+> **Try the live demo** (no install): [numnes.github.io/deployer](https://numnes.github.io/deployer/login/?demo=1)  
+> Sign in with `admin@demo.local` / `demo` (or `operator@demo.local` / `demo`). UI-only mocked data — details in [docs/demo.md](docs/demo.md).
+
 **deployer** is a self-hosted platform for **preview environments**, **ephemeral environments**, and **review apps** — temporary, isolated deploys you spin up per **branch** or **pull request** on infrastructure you control.
 
 Open a PR, trigger a GitHub Action, and get a live **deploy preview** URL. No Vercel lock-in, no per-seat SaaS. One VPS (or bare metal), nginx, PM2, and a dashboard to manage what is running.
@@ -11,8 +14,6 @@ Also useful if you search for: **feature-branch environments**, **dynamic enviro
 Each branch gets its own checkout, PM2 process, and nginx route (`/{project-slug}-{branch-slug}/`). The dashboard shows active, waiting, paused, and failed instances; a global **slot limit** queues excess deploys until a preview is torn down. Teardown on PR close is supported via workflow.
 
 Self-host on a single machine — or aggregate several deployer hosts from one dashboard via **cluster** credentials.
-
-Want a UI-only walkthrough (no backend)? See the [interactive frontend demo](docs/demo.md) (`/demo`) — it can also be published on GitHub Pages.
 
 > **Coming soon:** **Kubernetes** as a runtime backend for preview instances. **Docker** is already supported per project (`deployer project init`); PM2 remains the default on the host.
 

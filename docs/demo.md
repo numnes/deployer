@@ -4,6 +4,15 @@ The web UI can run entirely **mocked in the browser** — no Nest API, Postgres,
 
 Useful for walkthroughs and for hosting a static copy on **GitHub Pages**.
 
+## Live demo
+
+**https://numnes.github.io/deployer/login/?demo=1**
+
+| User | Email | Password | Role |
+|------|-------|----------|------|
+| Admin | `admin@demo.local` | `demo` | full access |
+| Operator | `operator@demo.local` | `demo` | instances only |
+
 ## Local (dev)
 
 ```bash
@@ -14,11 +23,6 @@ npm run dev:demo
 Open [http://localhost:3000/demo](http://localhost:3000/demo) → **Open demo login**.
 
 Or go to `/login?demo=1` (credentials pre-filled).
-
-| User | Email | Password | Role |
-|------|-------|----------|------|
-| Admin | `admin@demo.local` | `demo` | full access |
-| Operator | `operator@demo.local` | `demo` | instances only |
 
 Mutations (pause, activate, env edits, users, settings) update an **in-memory** store until you refresh / re-open the demo.
 
