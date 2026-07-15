@@ -1,12 +1,25 @@
 import { ConfigService } from '@nestjs/config';
 import { execFile } from 'child_process';
-import { readFile, unlink } from 'fs/promises';
+import { randomBytes } from 'crypto';
+import { readFile, unlink, writeFile } from 'fs/promises';
+import { tmpdir } from 'os';
 import { join } from 'path';
 import { promisify } from 'util';
+import {
+  envVarsToDotenv,
+  mergeEnvVars,
+  normalizeEnvVars,
+  type EnvVarsMap,
+} from '../common/env-vars.util';
 import type { DeployMeta } from './deploy-meta';
 import { pm2AppName } from './pm2-name.util';
 
 const execFileAsync = promisify(execFile);
+
+export type DeployAppEnvInput = {
+  projectEnv?: EnvVarsMap | null;
+  instanceEnv?: EnvVarsMap | null;
+};
 
 export async function runCoreDeployScript(
   config: ConfigService,
@@ -14,6 +27,7 @@ export async function runCoreDeployScript(
   gitUrl: string,
   branch: string,
   image?: string,
+  appEnv?: DeployAppEnvInput,
 ): Promise<DeployMeta> {
   const coreDir =
     config.get<string>('DEPLOYER_CORE_DIR') ||
@@ -27,11 +41,33 @@ export async function runCoreDeployScript(
   if (image) {
     env.DEPLOYER_IMAGE = image;
   }
+
+  const merged = mergeEnvVars(
+    normalizeEnvVars(appEnv?.projectEnv),
+    normalizeEnvVars(appEnv?.instanceEnv),
+  );
+  let envFilePath: string | null = null;
+  if (Object.keys(merged).length > 0) {
+    envFilePath = join(
+      tmpdir(),
+      `deployer-app-env-${randomBytes(8).toString('hex')}.env`,
+    );
+    await writeFile(envFilePath, envVarsToDotenv(merged), 'utf8');
+    env.DEPLOYER_APP_ENV_FILE = envFilePath;
+  }
+
   const script = join(binDir, 'deploy.sh');
-  await execFileAsync(script, [projectSlug, gitUrl, branch], {
-    env,
-    maxBuffer: 10 * 1024 * 1024,
-  });
+  try {
+    await execFileAsync(script, [projectSlug, gitUrl, branch], {
+      env,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+  } finally {
+    if (envFilePath) {
+      await unlink(envFilePath).catch(() => undefined);
+    }
+  }
+
   const pm2Name = pm2AppName(projectSlug, branch);
   const metaPath = join(workRoot, '.deployer-state', `${pm2Name}.deploy-result.json`);
   const raw = await readFile(metaPath, 'utf8');

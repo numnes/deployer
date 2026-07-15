@@ -50,3 +50,18 @@ export async function removeInstance(id: string): Promise<{ ok: true }> {
     headers: { Authorization: `Bearer ${token}` },
   });
 }
+
+export async function patchInstance(
+  id: string,
+  body: { envVars?: Record<string, string> },
+): Promise<InstanceRow> {
+  const token = getTokenClient();
+  return await httpJson<InstanceRow>(`${apiBaseClient()}/instances/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+}

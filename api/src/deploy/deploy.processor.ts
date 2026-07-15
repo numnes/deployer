@@ -61,12 +61,17 @@ export class DeployProcessor extends WorkerHost {
       job.data.branch,
     );
     try {
+      const appEnv = await this.previewInstances.resolveDeployAppEnv(
+        job.data.projectSlug,
+        job.data.branch,
+      );
       const meta = await runCoreDeployScript(
         this.config,
         job.data.projectSlug,
         job.data.gitUrl as string,
         job.data.branch,
         job.data.image,
+        appEnv,
       );
       await this.previewInstances.finalizeDeploySuccess(meta);
     } catch (e) {

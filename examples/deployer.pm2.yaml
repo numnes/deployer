@@ -7,3 +7,8 @@ build:
 
 # Caminho relativo à raiz do repositório para o pm2 start.
 target: dist/main.js
+
+# Opcional: envs base no repositório (após build/target).
+# No deploy, o dashboard (projeto + override da instância) sobrescreve estas chaves.
+# env:
+#   NODE_ENV: production

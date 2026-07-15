@@ -54,6 +54,13 @@ export class PreviewInstance {
   @Column({ name: 'activated_at', type: 'timestamptz', nullable: true })
   activatedAt: Date | null;
 
+  /**
+   * Override de env por instância (sobrescreve as do projeto no merge do deploy).
+   * Objeto vazio = sem override.
+   */
+  @Column({ name: 'env_vars', type: 'jsonb', default: () => "'{}'" })
+  envVars: Record<string, string>;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

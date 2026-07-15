@@ -213,3 +213,35 @@ export function IconStatusError({ className = 'h-4 w-4' }: { className?: string 
     </svg>
   );
 }
+
+export function IconEnv({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M4 6h16" />
+      <path d="M4 12h10" />
+      <path d="M4 18h8" />
+      <path d="M16 14l2 2 4-4" />
+    </svg>
+  );
+}
+
+export function IconInfo({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <circle cx="12" cy="12" r="9" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
+      <line x1="12" y1="12" x2="12" y2="16" />
+    </svg>
+  );
+}
+
+export function IconScrollText({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M8 2h8a2 2 0 0 1 2 2v16l-3-2-3 2-3-2-3 2V4a2 2 0 0 1 2-2z" />
+      <path d="M9 7h6" />
+      <path d="M9 11h6" />
+      <path d="M9 15h4" />
+    </svg>
+  );
+}

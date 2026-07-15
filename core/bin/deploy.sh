@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Uso: deploy.sh <slug-projeto> <url-git> <branch>
-# Env opcional: DEPLOYER_IMAGE=<registry/image:tag> (modo docker remoto)
+# Env opcional:
+#   DEPLOYER_IMAGE=<registry/image:tag> (modo docker remoto)
+#   DEPLOYER_APP_ENV_FILE=<path> (.env do dashboard: projeto + override da instância)
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/common.sh
@@ -26,6 +28,14 @@ LOCATION_BASENAME="$(location_file_basename "$PROJECT_SLUG" "$BRANCH_SLUG")"
 TARGET_DIR="${DEPLOYER_WORK_ROOT}/${PROJECT_SLUG}/${BRANCH_SLUG}"
 LOCATIONS_DIR="${DEPLOYER_LOCATIONS_DIR}"
 NAME="$(instance_name "$PROJECT_SLUG" "$BRANCH")"
+MERGED_ENV_FILE=""
+
+cleanup_merged_env() {
+  if [[ -n "${MERGED_ENV_FILE:-}" && -f "$MERGED_ENV_FILE" ]]; then
+    rm -f "$MERGED_ENV_FILE"
+  fi
+}
+trap cleanup_merged_env EXIT
 
 clone_or_update_repo() {
   if [[ -d "${TARGET_DIR}/.git" ]]; then
@@ -73,6 +83,65 @@ print(f"[deploy] metadados gravados em {path}", file=sys.stderr)
 PY
 }
 
+# Gera ecosystem temporário PM2 com env (PORT + merged dotenv).
+pm2_start_with_env() {
+  local abs_target="$1"
+  local port="$2"
+  local env_file="$3"
+  local eco
+  eco="$(mktemp "${DEPLOYER_STATE_DIR}/${NAME}.eco.XXXXXX.js")"
+  export _D_ECO_OUT="$eco"
+  export _D_ECO_NAME="$NAME"
+  export _D_ECO_SCRIPT="$abs_target"
+  export _D_ECO_PORT="$port"
+  export _D_ECO_ENV="$env_file"
+  python3 <<'PY'
+import json, os, re
+
+KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+env = {"PORT": os.environ["_D_ECO_PORT"]}
+path = os.environ.get("_D_ECO_ENV") or ""
+if path:
+    try:
+        text = open(path, encoding="utf-8").read()
+    except FileNotFoundError:
+        text = ""
+    for line in text.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        eq = s.find("=")
+        if eq <= 0:
+            continue
+        key = s[:eq].strip()
+        if not KEY_RE.match(key):
+            continue
+        val = s[eq + 1 :].strip()
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
+            val = val[1:-1]
+            val = (
+                val.replace("\\n", "\n")
+                .replace("\\r", "\r")
+                .replace('\\"', '"')
+                .replace("\\\\", "\\")
+            )
+        env[key] = val
+# PORT do deployer sempre vence
+env["PORT"] = os.environ["_D_ECO_PORT"]
+app = {
+    "name": os.environ["_D_ECO_NAME"],
+    "script": os.environ["_D_ECO_SCRIPT"],
+    "env": env,
+}
+out = os.environ["_D_ECO_OUT"]
+with open(out, "w", encoding="utf-8") as f:
+    f.write("module.exports = " + json.dumps({"apps": [app]}, ensure_ascii=False) + ";\n")
+print(out)
+PY
+  pm2 start "$eco" --update-env
+  rm -f "$eco"
+}
+
 deploy_pm2() {
   local target="$1"
   shift
@@ -84,6 +153,12 @@ deploy_pm2() {
 
   (
     cd "$TARGET_DIR"
+    # Envs do dashboard / deployer.yaml disponíveis também no build.
+    if [[ -n "$MERGED_ENV_FILE" && -s "$MERGED_ENV_FILE" ]]; then
+      # shellcheck disable=SC1090
+      eval "$(exports_from_dotenv_file "$MERGED_ENV_FILE")"
+    fi
+    export PORT
     for cmd in "${build_cmds[@]}"; do
       log "[deploy] build: $cmd"
       bash -lc "$cmd" >&2
@@ -98,7 +173,8 @@ deploy_pm2() {
 
   stop_instance "$NAME"
   write_instance_runner "$NAME" "pm2"
-  env PORT="$PORT" pm2 start "$abs_target" --name "$NAME" --update-env
+  # Após a seção de comandos (build) do deployer.yaml: aplica envs no start PM2.
+  pm2_start_with_env "$abs_target" "$PORT" "$MERGED_ENV_FILE"
 
   write_location_file "$LOCATIONS_DIR" "$LOCATION_BASENAME" "$PORT"
   nginx_reload
@@ -147,10 +223,17 @@ deploy_docker() {
 
   stop_instance "$NAME"
   write_instance_runner "$NAME" "docker"
+
+  local -a docker_env_args=()
+  if [[ -n "$MERGED_ENV_FILE" && -s "$MERGED_ENV_FILE" ]]; then
+    docker_env_args+=(--env-file "$MERGED_ENV_FILE")
+  fi
+
   docker run -d \
     --name "$NAME" \
     -p "${host_port}:${container_port}" \
     --restart unless-stopped \
+    "${docker_env_args[@]}" \
     "$image_to_run" >/dev/null
 
   write_location_file "$LOCATIONS_DIR" "$LOCATION_BASENAME" "$host_port"
@@ -164,6 +247,16 @@ clone_or_update_repo
 
 mapfile -t _parsed < <(parse_deployer_yaml "$TARGET_DIR")
 RUNNER="${_parsed[0]}"
+
+YAML_ENV_LINES=()
+for line in "${_parsed[@]}"; do
+  if [[ "$line" == ENV:* ]]; then
+    YAML_ENV_LINES+=("$line")
+  fi
+done
+
+MERGED_ENV_FILE="$(mktemp "${DEPLOYER_STATE_DIR}/${NAME}.env.XXXXXX")"
+merge_app_env_file "$MERGED_ENV_FILE" "${YAML_ENV_LINES[@]}"
 
 if [[ "$RUNNER" == "pm2" ]]; then
   TARGET="${_parsed[1]}"

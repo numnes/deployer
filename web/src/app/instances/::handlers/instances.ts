@@ -29,6 +29,8 @@ export type InstanceRow = {
   existenceExpiresAt: string | null;
   hasActiveLifetimeLimit: boolean;
   hasExistenceLifetimeLimit: boolean;
+  envVars?: Record<string, string>;
+  projectEnvVars?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
 } & NodeRef;

@@ -12,6 +12,7 @@ export type Project = {
   maxActiveLifetimeHours: number | null;
   maxExistenceLifetimeDays: number | null;
   maxExistenceLifetimeHours: number | null;
+  envVars?: Record<string, string>;
   createdAt: string;
 } & NodeRef;
 
@@ -53,6 +54,7 @@ export async function patchProject(
     maxActiveLifetimeHours?: number | null;
     maxExistenceLifetimeDays?: number | null;
     maxExistenceLifetimeHours?: number | null;
+    envVars?: Record<string, string>;
   },
 ): Promise<Project> {
   const token = getTokenClient();

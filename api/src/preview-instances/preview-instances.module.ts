@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PreviewInstanceStatusEvent } from '../entities/preview-instance-status-event.entity';
 import { PreviewInstance } from '../entities/preview-instance.entity';
@@ -12,6 +13,7 @@ import { PreviewInstancesService } from './preview-instances.service';
     TypeOrmModule.forFeature([PreviewInstance, PreviewInstanceStatusEvent]),
     forwardRef(() => ProjectsModule),
     SettingsModule,
+    BullModule.registerQueue({ name: 'deploy' }),
   ],
   providers: [PreviewInstancesService, InstanceLifetimeScheduler],
   exports: [PreviewInstancesService],

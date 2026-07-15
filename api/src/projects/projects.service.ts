@@ -1,6 +1,7 @@
-import { Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { isEnvVarsMap, normalizeEnvVars } from '../common/env-vars.util';
 import { Project } from '../entities/project.entity';
 import { PreviewInstancesService } from '../preview-instances/preview-instances.service';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -20,6 +21,7 @@ export class ProjectsService {
       slug: dto.slug,
       gitUrl: dto.gitUrl,
       serverUrl: dto.serverUrl?.trim() || null,
+      envVars: {},
     });
     return this.repo.save(p);
   }
@@ -61,6 +63,14 @@ export class ProjectsService {
     }
     if (dto.maxExistenceLifetimeHours !== undefined) {
       p.maxExistenceLifetimeHours = dto.maxExistenceLifetimeHours;
+    }
+    if (dto.envVars !== undefined) {
+      if (!isEnvVarsMap(dto.envVars)) {
+        throw new BadRequestException(
+          'envVars inválido: chaves devem ser nomes de env ([A-Za-z_][A-Za-z0-9_]*) e valores string',
+        );
+      }
+      p.envVars = normalizeEnvVars(dto.envVars);
     }
     return this.repo.save(p);
   }

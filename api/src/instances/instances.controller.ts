@@ -1,15 +1,18 @@
 import {
+  Body,
   Controller,
   DefaultValuePipe,
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { UpdateInstanceDto } from './dto/update-instance.dto';
 import { InstancesService } from './instances.service';
 
 @ApiTags('instances')
@@ -34,6 +37,14 @@ export class InstancesController {
     @Query('lines', new DefaultValuePipe(200), ParseIntPipe) lines: number,
   ) {
     return this.instances.logsForInstance(id, lines);
+  }
+
+  @ApiBearerAuth('jwt')
+  @ApiOkResponse({ description: 'Atualiza override de env da instância' })
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  patch(@Param('id') id: string, @Body() dto: UpdateInstanceDto) {
+    return this.instances.update(id, dto);
   }
 
   @ApiBearerAuth('jwt')

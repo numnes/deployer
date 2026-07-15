@@ -8,6 +8,7 @@ import {
   PreviewInstancesService,
   type InstanceListItem,
 } from '../preview-instances/preview-instances.service';
+import type { UpdateInstanceDto } from './dto/update-instance.dto';
 
 const execFileAsync = promisify(execFile);
 
@@ -45,12 +46,27 @@ export class InstancesService {
     return this.cluster.tagLocal(row);
   }
 
+  async update(id: string, dto: UpdateInstanceDto): Promise<InstanceListItem> {
+    const remote = parseRemoteId(id);
+    if (remote) {
+      throw new NotFoundException(
+        'Override de env em instâncias remotas ainda não é suportado; edite no nó de origem',
+      );
+    }
+    if (dto.envVars === undefined) {
+      return this.getOneForApi(id);
+    }
+    const row = await this.previewInstances.updateEnvVars(id, dto.envVars);
+    return this.cluster.tagLocal(row);
+  }
+
   async pause(id: string): Promise<InstanceListItem> {
     const remote = parseRemoteId(id);
     if (remote) {
       return this.cluster.pauseRemoteInstance(remote.nodeId, remote.remoteId);
     }
-    return this.previewInstances.pauseInstance(id);
+    const row = await this.previewInstances.pauseInstance(id);
+    return this.cluster.tagLocal(row);
   }
 
   async activate(id: string): Promise<InstanceListItem> {
@@ -58,7 +74,8 @@ export class InstancesService {
     if (remote) {
       return this.cluster.activateRemoteInstance(remote.nodeId, remote.remoteId);
     }
-    return this.previewInstances.activateOrRedeployInstance(id);
+    const row = await this.previewInstances.activateOrRedeployInstance(id);
+    return this.cluster.tagLocal(row);
   }
 
   async remove(id: string): Promise<{ ok: true }> {

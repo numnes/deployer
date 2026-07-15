@@ -7,14 +7,26 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { execFile } from 'child_process';
 import { join } from 'path';
 import { promisify } from 'util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import {
+  isEnvVarsMap,
+  normalizeEnvVars,
+  type EnvVarsMap,
+} from '../common/env-vars.util';
 import type { DeployMeta } from '../deploy/deploy-meta';
+import type { DeployJobPayload } from '../deploy/deploy.processor';
 import { formatDeployError } from '../deploy/format-deploy-error';
-import { runCoreDeployScript, runCorePauseScript } from '../deploy/deploy-exec.helper';
+import {
+  runCoreDeployScript,
+  runCorePauseScript,
+  type DeployAppEnvInput,
+} from '../deploy/deploy-exec.helper';
 import { pm2AppName, sanitizeBranchSlug } from '../deploy/pm2-name.util';
 import { PreviewInstance } from '../entities/preview-instance.entity';
 import { PreviewInstanceStatusEvent } from '../entities/preview-instance-status-event.entity';
@@ -78,6 +90,10 @@ export type InstanceListItem = {
   existenceExpiresAt: Date | null;
   hasActiveLifetimeLimit: boolean;
   hasExistenceLifetimeLimit: boolean;
+  /** Override de env desta instância. */
+  envVars: EnvVarsMap;
+  /** Envs padrão do projeto (antes do merge com envVars). */
+  projectEnvVars: EnvVarsMap;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -95,8 +111,17 @@ export class PreviewInstancesService {
     private readonly projects: ProjectsService,
     private readonly settings: SettingsService,
     private readonly config: ConfigService,
+    @InjectQueue('deploy')
+    private readonly deployQueue: Queue<DeployJobPayload>,
   ) {}
 
+  private async enqueueRedeployJob(projectSlug: string, branch: string, gitUrl: string) {
+    await this.deployQueue.add('create', {
+      projectSlug,
+      branch,
+      gitUrl,
+    });
+  }
   private async appendEvent(
     instanceId: string,
     oldStatus: string | null,
@@ -125,6 +150,38 @@ export class PreviewInstancesService {
 
   async countActiveSlots(): Promise<number> {
     return this.repo.count({ where: { status: 'active' } });
+  }
+
+  /** Envs do projeto (+ override da instância se já existir) para o shell de deploy. */
+  async resolveDeployAppEnv(
+    projectSlug: string,
+    branch: string,
+  ): Promise<DeployAppEnvInput> {
+    const project = await this.projects.getBySlug(projectSlug);
+    const row = await this.repo.findOne({
+      where: { projectId: project.id, branch },
+    });
+    return {
+      projectEnv: normalizeEnvVars(project.envVars),
+      instanceEnv: normalizeEnvVars(row?.envVars),
+    };
+  }
+
+  async updateEnvVars(id: string, envVars: unknown): Promise<InstanceListItem> {
+    if (!isEnvVarsMap(envVars)) {
+      throw new BadRequestException(
+        'envVars inválido: chaves devem ser nomes de env ([A-Za-z_][A-Za-z0-9_]*) e valores string',
+      );
+    }
+    const row = await this.repo.findOne({ where: { id }, relations: ['project'] });
+    if (!row?.project) {
+      throw new NotFoundException(`Instância "${id}" não encontrada`);
+    }
+    row.envVars = normalizeEnvVars(envVars);
+    await this.repo.save(row);
+    const maps = await this.fetchRuntimeMaps();
+    const fresh = await this.repo.findOne({ where: { id }, relations: ['project'] });
+    return this.buildListItem(fresh as PreviewInstance, maps);
   }
 
   /**
@@ -254,7 +311,15 @@ export class PreviewInstancesService {
       const slug = next.project.slug;
       try {
         await this.setStatus(next, 'deploying');
-        const meta = await runCoreDeployScript(this.config, slug, gitUrl, next.branch);
+        const appEnv = await this.resolveDeployAppEnv(slug, next.branch);
+        const meta = await runCoreDeployScript(
+          this.config,
+          slug,
+          gitUrl,
+          next.branch,
+          undefined,
+          appEnv,
+        );
         await this.finalizeDeploySuccess(meta);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -394,6 +459,8 @@ export class PreviewInstancesService {
       existenceExpiresAt,
       hasActiveLifetimeLimit,
       hasExistenceLifetimeLimit,
+      envVars: normalizeEnvVars(r.envVars),
+      projectEnvVars: normalizeEnvVars(r.project?.envVars),
       createdAt: r.createdAt,
       updatedAt: r.updatedAt,
     };
@@ -447,28 +514,23 @@ export class PreviewInstancesService {
       relations: ['project'],
     });
     if (!row?.project) throw new NotFoundException();
-    if (row.status === 'active') {
+
+    const enqueueAndReturn = async () => {
       row.lastDeployError = null;
       await this.repo.save(row);
       await this.setStatus(row, 'deploying');
-      try {
-        const meta = await runCoreDeployScript(
-          this.config,
-          row.project.slug,
-          row.project.gitUrl,
-          row.branch,
-        );
-        await this.finalizeDeploySuccess(meta);
-      } catch (e) {
-        await this.finalizeDeployError(
-          row.project.slug,
-          row.branch,
-          formatDeployError(e),
-        );
-        throw e;
-      }
-      await this.processWaitingQueue();
-    } else if (
+      await this.enqueueRedeployJob(row.project.slug, row.branch, row.project.gitUrl);
+      const maps = await this.fetchRuntimeMaps();
+      const fresh = await this.repo.findOne({ where: { id }, relations: ['project'] });
+      return this.buildListItem(fresh as PreviewInstance, maps);
+    };
+
+    if (row.status === 'active') {
+      // Redeploy via fila BullMQ — não bloqueia o HTTP (build docker/pm2 pode demorar).
+      return enqueueAndReturn();
+    }
+
+    if (
       row.status === 'waiting' ||
       row.status === 'paused' ||
       row.status === 'error'
@@ -484,36 +546,13 @@ export class PreviewInstancesService {
         });
         return this.buildListItem(fresh as PreviewInstance, maps);
       }
-      row.lastDeployError = null;
-      await this.repo.save(row);
-      await this.setStatus(row, 'deploying');
-      try {
-        const meta = await runCoreDeployScript(
-          this.config,
-          row.project.slug,
-          row.project.gitUrl,
-          row.branch,
-        );
-        await this.finalizeDeploySuccess(meta);
-      } catch (e) {
-        await this.finalizeDeployError(
-          row.project.slug,
-          row.branch,
-          formatDeployError(e),
-        );
-        throw e;
-      }
-      await this.processWaitingQueue();
-    } else {
-      throw new BadRequestException(
-        `Estado "${row.status}" não suporta ativação forçada agora`,
-      );
+      return enqueueAndReturn();
     }
-    const maps = await this.fetchRuntimeMaps();
-    const fresh = await this.repo.findOne({ where: { id }, relations: ['project'] });
-    return this.buildListItem(fresh as PreviewInstance, maps);
-  }
 
+    throw new BadRequestException(
+      `Estado "${row.status}" não suporta ativação forçada agora`,
+    );
+  }
   async findAllByProjectId(projectId: string): Promise<PreviewInstance[]> {
     return this.repo.find({
       where: { projectId },

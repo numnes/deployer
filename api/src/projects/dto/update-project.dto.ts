@@ -2,6 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   IsUrl,
@@ -73,4 +74,13 @@ export class UpdateProjectDto {
   @Min(0)
   @Max(87600)
   maxExistenceLifetimeHours?: number | null;
+
+  @ApiPropertyOptional({
+    example: { DATABASE_URL: 'postgres://…', NODE_ENV: 'production' },
+    description:
+      'Envs padrão do projeto (KEY → string). Aplicadas no deploy de cada instância; a instância pode sobrescrever chaves individuais.',
+  })
+  @IsOptional()
+  @IsObject()
+  envVars?: Record<string, string>;
 }

@@ -36,6 +36,13 @@ export class Project {
   @Column({ name: 'max_existence_lifetime_hours', type: 'int', nullable: true })
   maxExistenceLifetimeHours: number | null;
 
+  /**
+   * Variáveis de ambiente padrão aplicadas a todas as instâncias deste projeto
+   * no deploy (sobrescritas por envVars da instância).
+   */
+  @Column({ name: 'env_vars', type: 'jsonb', default: () => "'{}'" })
+  envVars: Record<string, string>;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

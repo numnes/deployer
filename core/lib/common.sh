@@ -138,5 +138,131 @@ else:
     print(target)
     for c in build:
         print("BUILD:" + c)
+# env: opcional (após build / target), aplicado no run (e no build pm2)
+env_map = d.get("env") or {}
+if isinstance(env_map, dict):
+    for k, v in env_map.items():
+        if v is None:
+            continue
+        key = str(k)
+        if not key or not key.replace("_", "").isalnum() or key[0].isdigit():
+            continue
+        # valor serializado sem quebra de linha no protocolo BUILD:/ENV:
+        val = str(v).replace("\n", "\\n")
+        print(f"ENV:{key}={val}")
+PY
+}
+
+# Junta env do deployer.yaml + arquivo da API (API sobrescreve) num arquivo dotenv.
+# Uso: merge_app_env_file <arquivo-saida> ENV:key=value...
+# Lê também DEPLOYER_APP_ENV_FILE se definido.
+merge_app_env_file() {
+  local out_file="$1"
+  shift
+  python3 - "$out_file" "${DEPLOYER_APP_ENV_FILE:-}" "$@" <<'PY'
+import sys, re
+out_path = sys.argv[1]
+api_path = sys.argv[2] or ""
+yaml_pairs = sys.argv[3:]
+
+KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+def parse_dotenv(text: str) -> dict:
+    result = {}
+    for line in text.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        eq = s.find("=")
+        if eq <= 0:
+            continue
+        key = s[:eq].strip()
+        if not KEY_RE.match(key):
+            continue
+        val = s[eq + 1 :].strip()
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
+            val = val[1:-1]
+            val = (
+                val.replace("\\n", "\n")
+                .replace("\\r", "\r")
+                .replace('\\"', '"')
+                .replace("\\\\", "\\")
+            )
+        result[key] = val
+    return result
+
+def serialize(vars_map: dict) -> str:
+    lines = []
+    for key in sorted(vars_map):
+        raw = vars_map[key]
+        needs = (not raw) or any(c in raw for c in ' \t#"\'=\\\n\r')
+        if needs:
+            esc = (
+                raw.replace("\\", "\\\\")
+                .replace('"', '\\"')
+                .replace("\r", "\\r")
+                .replace("\n", "\\n")
+            )
+            lines.append(f'{key}="{esc}"')
+        else:
+            lines.append(f"{key}={raw}")
+    return ("\n".join(lines) + "\n") if lines else ""
+
+merged = {}
+for item in yaml_pairs:
+    if not item.startswith("ENV:"):
+        continue
+    body = item[4:]
+    eq = body.find("=")
+    if eq <= 0:
+        continue
+    key, val = body[:eq], body[eq + 1 :].replace("\\n", "\n")
+    if KEY_RE.match(key):
+        merged[key] = val
+
+if api_path:
+    try:
+        with open(api_path, encoding="utf-8") as f:
+            merged.update(parse_dotenv(f.read()))
+    except FileNotFoundError:
+        pass
+
+with open(out_path, "w", encoding="utf-8") as f:
+    f.write(serialize(merged))
+PY
+}
+
+# Exporta KEY=VALUE de um dotenv no ambiente atual (eval-safe via python).
+# Uso: eval "$(exports_from_dotenv_file /path/to.env)"
+exports_from_dotenv_file() {
+  local file="$1"
+  python3 - "$file" <<'PY'
+import sys, re, shlex
+path = sys.argv[1]
+KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+try:
+    text = open(path, encoding="utf-8").read()
+except FileNotFoundError:
+    sys.exit(0)
+for line in text.splitlines():
+    s = line.strip()
+    if not s or s.startswith("#"):
+        continue
+    eq = s.find("=")
+    if eq <= 0:
+        continue
+    key = s[:eq].strip()
+    if not KEY_RE.match(key):
+        continue
+    val = s[eq + 1 :].strip()
+    if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
+        val = val[1:-1]
+        val = (
+            val.replace("\\n", "\n")
+            .replace("\\r", "\r")
+            .replace('\\"', '"')
+            .replace("\\\\", "\\")
+        )
+    print(f"export {key}={shlex.quote(val)}")
 PY
 }
