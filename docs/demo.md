@@ -31,7 +31,7 @@ NEXT_PUBLIC_BASE_PATH=/REPO npm run build:demo
 # Output: web/out/
 ```
 
-Serve `web/out` with any static host. On GitHub Pages, publish the `out/` folder (see workflow below).
+Serve `web/out` with any static host. To publish from CI, copy [`docs/examples/demo-pages.workflow.yml`](examples/demo-pages.workflow.yml) to `.github/workflows/demo-pages.yml` (requires a GitHub token with the `workflow` scope the first time), then enable **Settings → Pages → GitHub Actions**.
 
 **Requirements for Pages:**
 
