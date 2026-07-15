@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: deployer
       POSTGRES_DB: deployer
     ports:
-      - "${POSTGRES_PUBLISH_PORT:-5432}:5432"
+      - "${POSTGRES_PUBLISH_PORT:-5431}:5432"
     volumes:
       - deployer_pg:/var/lib/postgresql/data
     healthcheck:
@@ -21,7 +21,7 @@ services:
     container_name: deployer-redis
     command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "${REDIS_PUBLISH_PORT:-6480}:6379"
+      - "${REDIS_PUBLISH_PORT:-6481}:6379"
     volumes:
       - deployer_redis:/data
 

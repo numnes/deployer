@@ -88,6 +88,72 @@ export function rowsToEnvVars(
   return out;
 }
 
+function escapeDotenvValue(raw: string): string {
+  const needsQuote =
+    /[\s#"'=\\]/.test(raw) || raw === '' || raw.includes('\n') || raw.includes('\r');
+  if (!needsQuote) return raw;
+  const escaped = raw
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n');
+  return `"${escaped}"`;
+}
+
+function unescapeDotenvValue(value: string): string {
+  let v = value.trim();
+  if (
+    (v.startsWith('"') && v.endsWith('"')) ||
+    (v.startsWith("'") && v.endsWith("'"))
+  ) {
+    v = v.slice(1, -1);
+    v = v
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '\r')
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\');
+  }
+  return v;
+}
+
+/**
+ * Converte texto .env em linhas da tabela, incluindo chaves incompletas
+ * (sem `=`) para o switch table/text preservar o que o usuário digitou.
+ */
+export function dotenvTextToRows(
+  text: string,
+): Array<{ key: string; value: string }> {
+  const rows: Array<{ key: string; value: string }> = [];
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq < 0) {
+      rows.push({ key: trimmed, value: '' });
+      continue;
+    }
+    if (eq === 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const value = unescapeDotenvValue(trimmed.slice(eq + 1));
+    rows.push({ key, value });
+  }
+  return rows.length ? rows : [{ key: '', value: '' }];
+}
+
+/** Serializa linhas da tabela (incluindo drafts) de volta para texto .env. */
+export function rowsToDotenvText(
+  rows: Array<{ key: string; value: string }>,
+): string {
+  const lines: string[] = [];
+  for (const row of rows) {
+    const key = row.key.trim();
+    if (!key && row.value === '') continue;
+    if (!key) continue;
+    lines.push(`${key}=${escapeDotenvValue(row.value)}`);
+  }
+  return lines.length ? `${lines.join('\n')}\n` : '';
+}
+
 export function isValidEnvKey(key: string): boolean {
   return KEY_RE.test(key);
 }

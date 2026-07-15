@@ -1,10 +1,12 @@
 'use client';
 
 import {
+  dotenvTextToRows,
   envVarsToDotenv,
   envVarsToRows,
   isValidEnvKey,
   parseDotenv,
+  rowsToDotenvText,
   rowsToEnvVars,
   type EnvVarsMap,
 } from '@/lib/env-vars';
@@ -20,6 +22,16 @@ type Props = {
   hint?: string;
 };
 
+function mapsEqual(a: EnvVarsMap, b: EnvVarsMap): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+}
+
 export function EnvEditor({ value, onChange, disabled, hint }: Props) {
   const fileInputId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -29,13 +41,12 @@ export function EnvEditor({ value, onChange, disabled, hint }: Props) {
     const sorted = envVarsToRows(value);
     return sorted.length ? sorted : [{ key: '', value: '' }];
   });
-  const skipSync = useRef(false);
+  /** Evita sobrescrever o rascunho local quando o pai só ecoa o onChange. */
+  const lastCommitted = useRef<EnvVarsMap>(value);
 
   useEffect(() => {
-    if (skipSync.current) {
-      skipSync.current = false;
-      return;
-    }
+    if (mapsEqual(value, lastCommitted.current)) return;
+    lastCommitted.current = value;
     setText(envVarsToDotenv(value));
     const sorted = envVarsToRows(value);
     setRows(sorted.length ? sorted : [{ key: '', value: '' }]);
@@ -43,7 +54,7 @@ export function EnvEditor({ value, onChange, disabled, hint }: Props) {
 
   const commitMap = useCallback(
     (next: EnvVarsMap) => {
-      skipSync.current = true;
+      lastCommitted.current = next;
       onChange(next);
     },
     [onChange],
@@ -51,12 +62,25 @@ export function EnvEditor({ value, onChange, disabled, hint }: Props) {
 
   const applyText = (raw: string) => {
     setText(raw);
+    setRows(dotenvTextToRows(raw));
     commitMap(parseDotenv(raw));
   };
 
   const applyRows = (nextRows: Array<{ key: string; value: string }>) => {
-    setRows(nextRows);
-    commitMap(rowsToEnvVars(nextRows));
+    const normalized = nextRows.length ? nextRows : [{ key: '', value: '' }];
+    setRows(normalized);
+    setText(rowsToDotenvText(normalized));
+    commitMap(rowsToEnvVars(normalized));
+  };
+
+  const switchMode = (next: Mode) => {
+    if (next === mode) return;
+    if (next === 'table') {
+      setRows(dotenvTextToRows(text));
+    } else {
+      setText(rowsToDotenvText(rows));
+    }
+    setMode(next);
   };
 
   return (
@@ -71,7 +95,7 @@ export function EnvEditor({ value, onChange, disabled, hint }: Props) {
                 : 'text-[#8b919a] hover:text-[#e8eaed]'
             }`}
             disabled={disabled}
-            onClick={() => setMode('table')}
+            onClick={() => switchMode('table')}
           >
             Table
           </button>
@@ -83,10 +107,7 @@ export function EnvEditor({ value, onChange, disabled, hint }: Props) {
                 : 'text-[#8b919a] hover:text-[#e8eaed]'
             }`}
             disabled={disabled}
-            onClick={() => {
-              setText(envVarsToDotenv(rowsToEnvVars(rows)));
-              setMode('text');
-            }}
+            onClick={() => switchMode('text')}
           >
             Plain text
           </button>
@@ -176,8 +197,8 @@ export function EnvEditor({ value, onChange, disabled, hint }: Props) {
                     <td className="px-1 py-1.5 align-top">
                       <button
                         type="button"
-                        className="btn px-2 text-xs text-rose-200/80"
-                        disabled={disabled || rows.length <= 1}
+                        className="btn px-2 text-xs text-rose-200/80 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={disabled}
                         title="Remove row"
                         onClick={() => {
                           const next = rows.filter((_, i) => i !== idx);
