@@ -2,6 +2,7 @@ api/node_modules/
 api/dist/
 web/node_modules/
 web/.next/
+web/out/
 tui/node_modules/
 **/node_modules/
 *.log
@@ -9,3 +10,4 @@ tui/node_modules/
 .env.local
 **/.env
 **/.env.*
+!**/.env.example

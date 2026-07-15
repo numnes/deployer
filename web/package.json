@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:demo": "NEXT_PUBLIC_DEMO=1 NEXT_PUBLIC_API_URL=https://demo.local next dev",
     "build": "next build",
+    "build:demo": "NEXT_PUBLIC_DEMO=1 NEXT_PUBLIC_API_URL=https://demo.local next build",
     "start": "next start",
     "lint": "next lint"
   },

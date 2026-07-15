@@ -1,6 +1,11 @@
 import { clearTokenClient } from './client-auth';
+import { isDemoMode } from '@/demo/mode';
+import { demoFetchJson, DemoHttpError } from '@/demo/router';
 
 export function apiBaseClient(): string {
+  if (isDemoMode()) {
+    return 'https://demo.local';
+  }
   const url = process.env.NEXT_PUBLIC_API_URL;
   if (!url) {
     throw new Error('NEXT_PUBLIC_API_URL is not configured');
@@ -19,8 +24,9 @@ export class UnauthorizedError extends Error {
 function handleUnauthorized() {
   if (typeof window === 'undefined') return;
   clearTokenClient();
-  if (window.location.pathname !== '/login') {
-    window.location.assign('/login');
+  const loginPath = `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/login`;
+  if (!window.location.pathname.endsWith('/login')) {
+    window.location.assign(loginPath || '/login');
   }
 }
 
@@ -28,6 +34,21 @@ export async function httpJson<T>(
   url: string,
   init?: RequestInit,
 ): Promise<T> {
+  if (isDemoMode()) {
+    try {
+      return await demoFetchJson<T>(url, init);
+    } catch (e) {
+      if (e instanceof Error && e.name === 'UnauthorizedError') {
+        handleUnauthorized();
+        throw new UnauthorizedError(e.message);
+      }
+      if (e instanceof DemoHttpError) {
+        throw new Error(e.message || `HTTP error ${e.status}`);
+      }
+      throw e;
+    }
+  }
+
   const res = await fetch(url, { ...init, cache: 'no-store' });
   if (res.status === 401) {
     handleUnauthorized();

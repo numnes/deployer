@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   IconBook,
   IconChevron,
@@ -19,6 +19,7 @@ import {
 import { clearTokenClient } from "@/lib/client-auth";
 import { useAuth } from "@/components/AuthProvider";
 import { isAdmin } from "@/lib/client-auth";
+import { isDemoMode } from "@/demo/mode";
 
 const SIDEBAR_OPEN_KEY = "deployer-sidebar-open";
 
@@ -179,6 +180,11 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
+  const [demo, setDemo] = useState(false);
+
+  useEffect(() => {
+    setDemo(isDemoMode());
+  }, []);
 
   const items = useMemo<NavItem[]>(() => {
     const base: NavItem[] = [
@@ -239,6 +245,11 @@ export function Sidebar() {
           </div>
           <div className="text-xs text-[#8b919a]">preview environments</div>
         </Link>
+        {demo ? (
+          <div className="mt-2 inline-flex rounded border border-amber-400/30 bg-amber-950/40 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-100/90">
+            Demo data
+          </div>
+        ) : null}
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {items.map((item) => (

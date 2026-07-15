@@ -12,6 +12,8 @@ Each branch gets its own checkout, PM2 process, and nginx route (`/{project-slug
 
 Self-host on a single machine — or aggregate several deployer hosts from one dashboard via **cluster** credentials.
 
+Want a UI-only walkthrough (no backend)? See the [interactive frontend demo](docs/demo.md) (`/demo`) — it can also be published on GitHub Pages.
+
 > **Coming soon:** **Kubernetes** as a runtime backend for preview instances. **Docker** is already supported per project (`deployer project init`); PM2 remains the default on the host.
 
 ## Quick start
