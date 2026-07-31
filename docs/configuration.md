@@ -2,12 +2,37 @@
 
 Main file: `api/.env` — **generated automatically** on `deployer setup` with Postgres/Redis/API/web ports, a random `JWT_SECRET`, `DEPLOYER_SETUP_KEY`, and `DEPLOYER_CLUSTER_SECRET`. Connection ports are picked from free local ports when defaults (3000, 3001, 5432, 6480) are in use. Re-running `setup` updates connection settings but **keeps** existing `JWT_SECRET`, `DEPLOYER_SETUP_KEY`, and `DEPLOYER_CLUSTER_SECRET`.
 
+## Public URLs (`deployer.env`)
+
+For a reverse proxy / path-based host (one domain for UI + API), create **`deployer.env`** at the install root. It survives `deployer restart` / `deployer setup` (unlike editing `CORS_ORIGIN` alone in `api/.env`, which used to be rewritten to localhost).
+
+```bash
+cp deployer.env.example deployer.env
+# edit DEPLOYER_PUBLIC_WEB_URL and DEPLOYER_PUBLIC_API_URL
+deployer restart
+```
+
+| Variable                        | Purpose                                                                 |
+| ------------------------------- | ----------------------------------------------------------------------- |
+| `DEPLOYER_PUBLIC_WEB_URL`       | Dashboard Origin → written as `CORS_ORIGIN` in `api/.env`               |
+| `DEPLOYER_PUBLIC_API_URL`       | Baked into the web image as `NEXT_PUBLIC_API_URL` (rebuild on restart)  |
+| `DEPLOYER_PUBLIC_WEB_BASE_PATH` | Optional Next `basePath` when the UI is not at `/` (e.g. `/deployer`) |
+
+Example (UI at `/`, API under `/api/` on the same host):
+
+```bash
+DEPLOYER_PUBLIC_WEB_URL=https://deployer.example.com
+DEPLOYER_PUBLIC_API_URL=https://deployer.example.com/api
+```
+
+If `deployer.env` is absent, defaults stay on `http://localhost:<ports>`. A non-local `CORS_ORIGIN` already present in `api/.env` is also preserved when `DEPLOYER_PUBLIC_WEB_URL` is unset.
+
 | Variable                    | Purpose                                                                                             |
 | --------------------------- | --------------------------------------------------------------------------------------------------- |
 | `PORT`                      | API listen port (default 3000)                                                                      |
 | `DATABASE_URL`              | Postgres (`postgresql://postgres:deployer@localhost:<port>/deployer`)                               |
 | `REDIS_HOST` / `REDIS_PORT` | Redis for BullMQ                                                                                    |
-| `CORS_ORIGIN`               | Web UI URL allowed by the API                                                                       |
+| `CORS_ORIGIN`               | Web UI Origin allowed by the API (from `DEPLOYER_PUBLIC_WEB_URL` or localhost)                      |
 | `DEPLOYER_WORK_ROOT`        | Where branch checkouts live on disk                                                                 |
 | `DEPLOYER_CORE_DIR`         | Path to `core/`                                                                                     |
 | `DEPLOYER_LOCATIONS_DIR`    | nginx `*.location` files (default `~/deployer/locations`)                                           |

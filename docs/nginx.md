@@ -34,4 +34,39 @@ Preview URLs are served by **nginx on the deployer host**. The core writes one `
 
 Verify from the dashboard: **Setup → Nginx** (directory, `nginx -t`, process check).
 
+## Dashboard + API on the same host (paths)
+
+If you cannot use separate subdomains for the deployer UI and API, proxy both on one `server_name` and set durable public URLs in `deployer.env` (see [configuration.md](configuration.md#public-urls-deployeren)):
+
+```nginx
+include /home/you/deployer/locations/*.location;
+
+location /api/ {
+    proxy_pass http://127.0.0.1:3002/;   # API port from deployer status
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location / {
+    proxy_pass http://127.0.0.1:3001;    # web publish port
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+```bash
+# deployer.env (install root)
+DEPLOYER_PUBLIC_WEB_URL=https://your-host.example.com
+DEPLOYER_PUBLIC_API_URL=https://your-host.example.com/api
+deployer restart
+```
+
+Put `/api/` (and the `locations` include) **before** `location /`.
+
 [← Back to README](../README.md)

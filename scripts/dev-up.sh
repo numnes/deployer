@@ -4,6 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/ports.sh
 source "${ROOT_DIR}/scripts/lib/ports.sh"
+# shellcheck source=lib/public-env.sh
+source "${ROOT_DIR}/scripts/lib/public-env.sh"
+load_deployer_public_env "$ROOT_DIR"
 
 compose() {
   docker compose -f "${ROOT_DIR}/docker-compose.dev.yml" "$@"
@@ -60,12 +63,22 @@ bash "${ROOT_DIR}/scripts/ensure-api-env.sh" \
   --web-port "$WEB_PUBLISH_PORT"
 
 export POSTGRES_PUBLISH_PORT REDIS_PUBLISH_PORT WEB_PUBLISH_PORT
-export NEXT_PUBLIC_API_URL="http://localhost:${API_PORT}"
+
+if [[ -n "${DEPLOYER_PUBLIC_API_URL:-}" ]]; then
+  export NEXT_PUBLIC_API_URL="${DEPLOYER_PUBLIC_API_URL%/}"
+else
+  export NEXT_PUBLIC_API_URL="http://localhost:${API_PORT}"
+fi
+if [[ -n "${DEPLOYER_PUBLIC_WEB_BASE_PATH:-}" ]]; then
+  export NEXT_PUBLIC_BASE_PATH="${DEPLOYER_PUBLIC_WEB_BASE_PATH}"
+else
+  export NEXT_PUBLIC_BASE_PATH=""
+fi
 
 echo "[dev-up] Starting Postgres/Redis in Docker..."
 compose up -d postgres redis
 
-echo "[dev-up] Building web container (no cache)..."
+echo "[dev-up] Building web (NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}${NEXT_PUBLIC_BASE_PATH:+, BASE_PATH=${NEXT_PUBLIC_BASE_PATH}})..."
 compose build web
 compose up -d web
 
@@ -131,6 +144,10 @@ echo "  - API:   http://localhost:${API_PORT} (PM2: deployer-api)"
 echo "  - Web:   http://localhost:${WEB_PUBLISH_PORT} (Docker: deployer-web)"
 echo "  - Postgres: localhost:${POSTGRES_PUBLISH_PORT}"
 echo "  - Redis: localhost:${REDIS_PUBLISH_PORT}"
+if [[ -n "${DEPLOYER_PUBLIC_API_URL:-}" || -n "${DEPLOYER_PUBLIC_WEB_URL:-}" ]]; then
+  echo "  - Public API URL: ${DEPLOYER_PUBLIC_API_URL:-"(unset)"}"
+  echo "  - Public Web / CORS: ${DEPLOYER_PUBLIC_WEB_URL:-"(from api/.env CORS_ORIGIN)"}"
+fi
 echo ""
 
 api_code="$(wait_for_http "http://localhost:${API_PORT}/docs" "API" || true)"

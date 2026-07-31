@@ -55,6 +55,8 @@ deployer status   # check services
 
 On first setup you'll be prompted for an admin email and password.
 
+Behind a reverse proxy (one domain / path for UI + API), copy `deployer.env.example` → `deployer.env`, set the public URLs, then `deployer restart`. See [docs/configuration.md](docs/configuration.md#public-urls-deployeren).
+
 ```bash
 deployer down       # stop everything (asks for confirmation)
 deployer down -y    # skip confirmation

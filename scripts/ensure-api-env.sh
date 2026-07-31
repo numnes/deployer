@@ -5,6 +5,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${ROOT_DIR}/api/.env"
 EXAMPLE_FILE="${ROOT_DIR}/api/.env.example"
+# shellcheck source=lib/public-env.sh
+source "${ROOT_DIR}/scripts/lib/public-env.sh"
+load_deployer_public_env "$ROOT_DIR"
 
 usage() {
   echo "Usage: ensure-api-env.sh --api-port PORT --postgres-port PORT --redis-port PORT --web-port PORT" >&2
@@ -97,6 +100,16 @@ set_env_var DEPLOYER_WORK_ROOT "$work_root"
 set_env_var DEPLOYER_CORE_DIR "$core_dir"
 set_env_var DEPLOYER_SETUP_KEY "$setup_key"
 set_env_var DEPLOYER_CLUSTER_SECRET "$cluster_secret"
-set_env_var CORS_ORIGIN "http://localhost:${WEB_PORT}"
 
-echo "[ensure-env] api/.env updated (API :${API_PORT}, Postgres :${POSTGRES_PORT}, Redis :${REDIS_PORT}, Web :${WEB_PORT})"
+# CORS: prefer deployer.env; else keep a non-local value already in api/.env; else localhost.
+existing_cors="$(get_env_var CORS_ORIGIN || true)"
+if [[ -n "${DEPLOYER_PUBLIC_WEB_URL:-}" ]]; then
+  cors_origin="${DEPLOYER_PUBLIC_WEB_URL%/}"
+elif [[ -n "$existing_cors" ]] && ! is_local_dev_url "$existing_cors"; then
+  cors_origin="$existing_cors"
+else
+  cors_origin="http://localhost:${WEB_PORT}"
+fi
+set_env_var CORS_ORIGIN "$cors_origin"
+
+echo "[ensure-env] api/.env updated (API :${API_PORT}, Postgres :${POSTGRES_PORT}, Redis :${REDIS_PORT}, Web :${WEB_PORT}, CORS :${cors_origin})"

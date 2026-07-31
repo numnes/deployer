@@ -72,17 +72,27 @@ case "$cmd" in
   status)
     echo "=== Deployer ($ROOT) ==="
     ENV_FILE="${ROOT}/api/.env"
+    PUBLIC_ENV="${ROOT}/deployer.env"
     if [[ -f "$ENV_FILE" ]]; then
       api_port="$(grep -E '^PORT=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
-      web_port="$(grep -E '^CORS_ORIGIN=' "$ENV_FILE" 2>/dev/null | tail -1 | sed 's/.*://' | tr -d '[:space:]')"
+      cors="$(grep -E '^CORS_ORIGIN=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
       pg_port="$(grep -E '^DATABASE_URL=' "$ENV_FILE" 2>/dev/null | tail -1 | sed -n 's/.*:\([0-9]*\)\/deployer.*/\1/p')"
       redis_port="$(grep -E '^REDIS_PORT=' "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d '[:space:]')"
       echo ""
       echo "Ports (from api/.env):"
       echo "  API:      ${api_port:-?}"
-      echo "  Web:      ${web_port:-?}"
       echo "  Postgres: ${pg_port:-?}"
       echo "  Redis:    ${redis_port:-?}"
+      echo "  CORS:     ${cors:-?}"
+    fi
+    if [[ -f "$PUBLIC_ENV" ]]; then
+      echo ""
+      echo "Public URLs (from deployer.env):"
+      grep -E '^DEPLOYER_PUBLIC_' "$PUBLIC_ENV" 2>/dev/null | sed 's/^/  /' || true
+    else
+      echo ""
+      echo "Public URLs: (no deployer.env — using localhost defaults)"
+      echo "  Tip: cp deployer.env.example deployer.env"
     fi
     echo ""
     echo "Docker:"
