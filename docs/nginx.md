@@ -64,6 +64,8 @@ location / {
 # deployer.env (install root)
 DEPLOYER_PUBLIC_WEB_URL=https://your-host.example.com
 DEPLOYER_PUBLIC_API_URL=https://your-host.example.com/api
+DEPLOYER_API_PORT=3002
+DEPLOYER_WEB_PORT=3001
 deployer restart
 ```
 

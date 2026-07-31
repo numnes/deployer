@@ -17,15 +17,21 @@ deployer restart
 | `DEPLOYER_PUBLIC_WEB_URL`       | Dashboard Origin → written as `CORS_ORIGIN` in `api/.env`               |
 | `DEPLOYER_PUBLIC_API_URL`       | Baked into the web image as `NEXT_PUBLIC_API_URL` (rebuild on restart)  |
 | `DEPLOYER_PUBLIC_WEB_BASE_PATH` | Optional Next `basePath` when the UI is not at `/` (e.g. `/deployer`) |
+| `DEPLOYER_API_PORT`             | Pin API host port (skip auto-pick; fail if busy)                        |
+| `DEPLOYER_WEB_PORT`             | Pin dashboard publish port                                              |
+| `DEPLOYER_POSTGRES_PORT`        | Pin Postgres publish port                                               |
+| `DEPLOYER_REDIS_PORT`           | Pin Redis publish port                                                  |
 
-Example (UI at `/`, API under `/api/` on the same host):
+Example (UI at `/`, API under `/api/` on the same host, stable local ports for nginx):
 
 ```bash
 DEPLOYER_PUBLIC_WEB_URL=https://deployer.example.com
 DEPLOYER_PUBLIC_API_URL=https://deployer.example.com/api
+DEPLOYER_API_PORT=3002
+DEPLOYER_WEB_PORT=3001
 ```
 
-If `deployer.env` is absent, defaults stay on `http://localhost:<ports>`. A non-local `CORS_ORIGIN` already present in `api/.env` is also preserved when `DEPLOYER_PUBLIC_WEB_URL` is unset.
+If `deployer.env` is absent, defaults stay on `http://localhost:<ports>` and ports are auto-picked when defaults are busy. A non-local `CORS_ORIGIN` already present in `api/.env` is also preserved when `DEPLOYER_PUBLIC_WEB_URL` is unset.
 
 | Variable                    | Purpose                                                                                             |
 | --------------------------- | --------------------------------------------------------------------------------------------------- |

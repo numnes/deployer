@@ -40,18 +40,21 @@ stop_api_for_port_scan() {
 echo "[dev-up] Resolving ports..."
 stop_api_for_port_scan
 
-POSTGRES_PUBLISH_PORT="$(pick_port 5432 deployer-postgres 5432 5433 5434 5435 5436 5440 5450)"
-REDIS_PUBLISH_PORT="$(pick_port 6480 deployer-redis 6379 6380 6381 6382 6481 6482 6483)"
-API_PORT="$(pick_port 3000 "" "" 3002 3003 3004 3005 3010 3020 3030)"
-WEB_PUBLISH_PORT="$(pick_port 3001 deployer-web 3000 3002 3003 3004 3005 3011 3021 3031)"
+# Fixed ports from deployer.env win over auto-pick (stable nginx → localhost mappings).
+POSTGRES_PUBLISH_PORT="$(pick_or_fixed "${DEPLOYER_POSTGRES_PORT:-}" 5432 deployer-postgres 5432 5433 5434 5435 5436 5440 5450)"
+REDIS_PUBLISH_PORT="$(pick_or_fixed "${DEPLOYER_REDIS_PORT:-}" 6480 deployer-redis 6379 6380 6381 6382 6481 6482 6483)"
+API_PORT="$(pick_or_fixed "${DEPLOYER_API_PORT:-}" 3000 "" "" 3002 3003 3004 3005 3010 3020 3030)"
+WEB_PUBLISH_PORT="$(pick_or_fixed "${DEPLOYER_WEB_PORT:-}" 3001 deployer-web 3000 3002 3003 3004 3005 3011 3021 3031)"
 
 for pair in \
-  "Postgres:${POSTGRES_PUBLISH_PORT}:5432" \
-  "Redis:${REDIS_PUBLISH_PORT}:6480" \
-  "API:${API_PORT}:3000" \
-  "Web:${WEB_PUBLISH_PORT}:3001"; do
-  IFS=: read -r label port default <<< "$pair"
-  if [[ "$port" != "$default" ]]; then
+  "Postgres:${POSTGRES_PUBLISH_PORT}:5432:${DEPLOYER_POSTGRES_PORT:-}" \
+  "Redis:${REDIS_PUBLISH_PORT}:6480:${DEPLOYER_REDIS_PORT:-}" \
+  "API:${API_PORT}:3000:${DEPLOYER_API_PORT:-}" \
+  "Web:${WEB_PUBLISH_PORT}:3001:${DEPLOYER_WEB_PORT:-}"; do
+  IFS=: read -r label port default fixed <<< "$pair"
+  if [[ -n "$fixed" ]]; then
+    echo "[dev-up] ${label} port fixed at ${port} (deployer.env)"
+  elif [[ "$port" != "$default" ]]; then
     echo "[dev-up] Port ${default} in use; ${label} on ${port}"
   fi
 done

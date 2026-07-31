@@ -62,3 +62,48 @@ pick_port() {
   echo "[ports] No free port (preferred ${preferred})." >&2
   exit 1
 }
+
+# pick_or_fixed FIXED preferred container internal_port fallbacks...
+# When FIXED is set (from deployer.env), use that port and fail if it is busy
+# (unless our Docker container already publishes it). Otherwise delegates to pick_port.
+pick_or_fixed() {
+  local fixed="${1:-}"
+  shift || true
+
+  if [[ -z "$fixed" ]]; then
+    pick_port "$@"
+    return
+  fi
+
+  if ! [[ "$fixed" =~ ^[0-9]+$ ]] || (( fixed < 1 || fixed > 65535 )); then
+    echo "[ports] Invalid fixed port: ${fixed}" >&2
+    exit 1
+  fi
+
+  local preferred="$1"
+  local container="${2:-}"
+  local internal_port="${3:-}"
+
+  if [[ -n "$container" && -n "$internal_port" ]]; then
+    local mapped
+    mapped="$(docker_host_port "$container" "$internal_port")"
+    if [[ "$mapped" == "$fixed" ]]; then
+      deployer_remember_port "$fixed"
+      echo "$fixed"
+      return 0
+    fi
+  fi
+
+  if deployer_port_is_picked "$fixed"; then
+    echo "[ports] Fixed port ${fixed} collides with another deployer service in this run." >&2
+    exit 1
+  fi
+
+  if port_in_use "$fixed"; then
+    echo "[ports] Fixed port ${fixed} is already in use. Free it or change deployer.env." >&2
+    exit 1
+  fi
+
+  deployer_remember_port "$fixed"
+  echo "$fixed"
+}
