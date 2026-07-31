@@ -20,6 +20,7 @@ import { clearTokenClient } from "@/lib/client-auth";
 import { useAuth } from "@/components/AuthProvider";
 import { isAdmin } from "@/lib/client-auth";
 import { isDemoMode } from "@/demo/mode";
+import { deployerVersionLabel } from "@/lib/version";
 
 const SIDEBAR_OPEN_KEY = "deployer-sidebar-open";
 
@@ -268,6 +269,12 @@ export function Sidebar() {
           <IconLogout />
           Sign out
         </button>
+        <p
+          className="mt-1 px-3 pb-1 text-[10px] tabular-nums tracking-wide text-[#6b7280]"
+          title="Deployer build version"
+        >
+          {deployerVersionLabel()}
+        </p>
       </div>
     </aside>
   );

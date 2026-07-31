@@ -77,11 +77,18 @@ if [[ -n "${DEPLOYER_PUBLIC_WEB_BASE_PATH:-}" ]]; then
 else
   export NEXT_PUBLIC_BASE_PATH=""
 fi
+if [[ -n "${DEPLOYER_VERSION:-}" ]]; then
+  export NEXT_PUBLIC_DEPLOYER_VERSION="${DEPLOYER_VERSION}"
+else
+  export NEXT_PUBLIC_DEPLOYER_VERSION="$(
+    git -C "${ROOT_DIR}" describe --tags --always 2>/dev/null || echo "dev"
+  )"
+fi
 
 echo "[dev-up] Starting Postgres/Redis in Docker..."
 compose up -d postgres redis
 
-echo "[dev-up] Building web (NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}${NEXT_PUBLIC_BASE_PATH:+, BASE_PATH=${NEXT_PUBLIC_BASE_PATH}})..."
+echo "[dev-up] Building web (NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}${NEXT_PUBLIC_BASE_PATH:+, BASE_PATH=${NEXT_PUBLIC_BASE_PATH}}, version=${NEXT_PUBLIC_DEPLOYER_VERSION})..."
 compose build web
 compose up -d web
 

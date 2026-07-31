@@ -21,6 +21,7 @@ deployer restart
 | `DEPLOYER_WEB_PORT`             | Pin dashboard publish port                                              |
 | `DEPLOYER_POSTGRES_PORT`        | Pin Postgres publish port                                               |
 | `DEPLOYER_REDIS_PORT`           | Pin Redis publish port                                                  |
+| `DEPLOYER_VERSION`              | Label in the dashboard sidebar (default: `git describe --tags`)         |
 
 Example (UI at `/`, API under `/api/` on the same host, stable local ports for nginx):
 
