@@ -27,7 +27,7 @@ if [[ "$runner" == "docker" ]]; then
   docker stop "$NAME" 2>/dev/null || true
   docker rm "$NAME" 2>/dev/null || true
 else
-  pm2 delete "$NAME" 2>/dev/null || true
+  pm2_delete_by_instance_name "$NAME"
 fi
 
 rm -f "${DEPLOYER_STATE_DIR}/${NAME}.port"

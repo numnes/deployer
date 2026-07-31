@@ -48,8 +48,40 @@ stop_instance() {
     docker stop "$name" 2>/dev/null || true
     docker rm "$name" 2>/dev/null || true
   else
-    pm2 delete "$name" 2>/dev/null || true
+    pm2_delete_by_instance_name "$name"
   fi
+}
+
+# Remove o processo PM2 pelo nome canônico e órfãos do bug antigo
+# (`name.eco.XXXXXX` quando o tempfile do ecosystem era usado como nome do app).
+pm2_delete_by_instance_name() {
+  local name="$1"
+  if ! command -v pm2 >/dev/null 2>&1; then
+    return 0
+  fi
+  pm2 delete "$name" 2>/dev/null || true
+  # Órfãos: nome exato do tempfile antigo (${name}.eco.XXXXXX)
+  local raw ids
+  raw="$(pm2 jlist 2>/dev/null || echo '[]')"
+  ids="$(NAME="$name" python3 -c '
+import json, os, sys
+name = os.environ["NAME"]
+try:
+    apps = json.loads(sys.stdin.read() or "[]")
+except json.JSONDecodeError:
+    apps = []
+for a in apps:
+    env = a.get("pm2_env") or {}
+    n = env.get("name") or a.get("name") or ""
+    if n == name or n.startswith(name + ".eco."):
+        pid = a.get("pm_id")
+        if pid is not None:
+            print(pid)
+' <<<"$raw")"
+  local id
+  for id in $ids; do
+    pm2 delete "$id" 2>/dev/null || true
+  done
 }
 
 next_free_port() {

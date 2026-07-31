@@ -130,16 +130,25 @@ export class InstancesService {
         return { pm2Name: name, lines: safeLines, output: out || '(sem saída)' };
       }
 
+      const pm2Name = await this.resolvePm2ProcessName(name);
       const { stdout, stderr } = await execFileAsync(
         'pm2',
-        ['logs', name, '--lines', String(safeLines), '--nostream'],
+        ['logs', pm2Name, '--lines', String(safeLines), '--nostream'],
         {
           maxBuffer: 10 * 1024 * 1024,
           env: { ...process.env },
         },
       );
       const out = [stdout, stderr].filter(Boolean).join('\n');
-      return { pm2Name: name, lines: safeLines, output: out || '(sem saída)' };
+      const note =
+        pm2Name !== name
+          ? `(PM2 process name: ${pm2Name} — legacy eco.* orphan; redeploy to fix)\n\n`
+          : '';
+      return {
+        pm2Name: name,
+        lines: safeLines,
+        output: note + (out || '(sem saída)'),
+      };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       const backend = row.runner === 'docker' ? 'Docker' : 'PM2';
@@ -149,6 +158,38 @@ export class InstancesService {
         lines: safeLines,
         output: `Não foi possível obter logs do ${backend}.\n${msg}`,
       };
+    }
+  }
+
+  /**
+   * Resolve o nome real no PM2: canônico ou órfão legado `name.eco.XXXX`
+   * (bug do tempfile do ecosystem).
+   */
+  private async resolvePm2ProcessName(canonical: string): Promise<string> {
+    try {
+      const { stdout } = await execFileAsync('pm2', ['jlist'], {
+        maxBuffer: 10 * 1024 * 1024,
+        env: { ...process.env },
+      });
+      const apps = JSON.parse(stdout || '[]') as Array<{
+        name?: string;
+        pm2_env?: { name?: string; status?: string };
+      }>;
+      const names = apps.map(
+        (a) => a.pm2_env?.name || a.name || '',
+      ).filter(Boolean);
+      if (names.includes(canonical)) return canonical;
+      const orphans = names.filter((n) => n.startsWith(`${canonical}.eco.`));
+      if (orphans.length === 0) return canonical;
+      // Prefer online, else most recently listed orphan
+      const online = apps.find((a) => {
+        const n = a.pm2_env?.name || a.name;
+        return n && orphans.includes(n) && a.pm2_env?.status === 'online';
+      });
+      if (online) return online.pm2_env?.name || online.name || orphans[0];
+      return orphans[orphans.length - 1];
+    } catch {
+      return canonical;
     }
   }
 }

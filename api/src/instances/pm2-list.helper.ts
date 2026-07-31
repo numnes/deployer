@@ -38,5 +38,23 @@ export async function fetchPm2ByName(
       map.set(r.name, { status: r.status ?? null, monit: r.monit });
     }
   }
+  // Alias órfãos legados `canonical.eco.XXXX` → canonical (para status na UI).
+  for (const r of rows) {
+    const n = r.name;
+    if (!n) continue;
+    const m = /^(.*)\.eco\.[A-Za-z0-9]+$/.exec(n);
+    if (!m) continue;
+    const canonical = m[1];
+    const existing = map.get(canonical);
+    const row = { status: r.status ?? null, monit: r.monit };
+    if (!existing) {
+      map.set(canonical, row);
+      continue;
+    }
+    // Prefere online sobre errored/stopped.
+    if (existing.status !== 'online' && row.status === 'online') {
+      map.set(canonical, row);
+    }
+  }
   return map;
 }

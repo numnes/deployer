@@ -84,12 +84,15 @@ PY
 }
 
 # Gera ecosystem temporário PM2 com env (PORT + merged dotenv).
+# O arquivo DEVE chamar-se ecosystem.config.js — se o path for
+# `name.eco.XXXX.js`, algumas versões do PM2 usam o filename como nome do app.
 pm2_start_with_env() {
   local abs_target="$1"
   local port="$2"
   local env_file="$3"
-  local eco
-  eco="$(mktemp "${DEPLOYER_STATE_DIR}/${NAME}.eco.XXXXXX.js")"
+  local eco_dir eco
+  eco_dir="$(mktemp -d "${DEPLOYER_STATE_DIR}/eco.XXXXXX")"
+  eco="${eco_dir}/ecosystem.config.js"
   export _D_ECO_OUT="$eco"
   export _D_ECO_NAME="$NAME"
   export _D_ECO_SCRIPT="$abs_target"
@@ -138,8 +141,33 @@ with open(out, "w", encoding="utf-8") as f:
     f.write("module.exports = " + json.dumps({"apps": [app]}, ensure_ascii=False) + ";\n")
 print(out)
 PY
-  pm2 start "$eco" --update-env
-  rm -f "$eco"
+  pm2 start "$eco" --only "$NAME" --update-env
+  rm -rf "$eco_dir"
+
+  # Confirma que o processo ficou online com o nome canônico.
+  local status
+  status="$(NAME="$NAME" python3 -c '
+import json, os, subprocess
+name = os.environ["NAME"]
+try:
+    raw = subprocess.check_output(["pm2", "jlist"], text=True, stderr=subprocess.DEVNULL)
+    apps = json.loads(raw) if raw.strip() else []
+except Exception:
+    apps = []
+for a in apps:
+    env = a.get("pm2_env") or {}
+    n = env.get("name") or a.get("name") or ""
+    if n == name:
+        print(env.get("status") or "")
+        raise SystemExit(0)
+print("")
+')"
+  if [[ "$status" != "online" ]]; then
+    log "[deploy] PM2 status for ${NAME}: ${status:-not-found} (expected online)"
+    pm2 logs "$NAME" --lines 80 --nostream >&2 || true
+    echo "Deploy PM2 falhou: processo '${NAME}' não ficou online (status=${status:-missing})." >&2
+    exit 1
+  fi
 }
 
 deploy_pm2() {
