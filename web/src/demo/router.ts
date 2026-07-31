@@ -156,6 +156,7 @@ function handleProjects(
       isLocal: true,
       online: true,
       canWrite: true,
+      portEnvNames: [],
     };
     s.projects.push(p);
     return p;

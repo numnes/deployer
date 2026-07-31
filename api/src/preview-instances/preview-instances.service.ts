@@ -164,6 +164,7 @@ export class PreviewInstancesService {
     return {
       projectEnv: normalizeEnvVars(project.envVars),
       instanceEnv: normalizeEnvVars(row?.envVars),
+      portEnvNames: project.portEnvNames ?? [],
     };
   }
 

@@ -11,6 +11,7 @@ import {
   normalizeEnvVars,
   type EnvVarsMap,
 } from '../common/env-vars.util';
+import { resolvePortEnvNames } from '../common/port-env-names.util';
 import type { DeployMeta } from './deploy-meta';
 import { pm2AppName } from './pm2-name.util';
 
@@ -19,6 +20,8 @@ const execFileAsync = promisify(execFile);
 export type DeployAppEnvInput = {
   projectEnv?: EnvVarsMap | null;
   instanceEnv?: EnvVarsMap | null;
+  /** Extras além de PORT / SERVER_PORT / APP_PORT */
+  portEnvNames?: string[] | null;
 };
 
 export async function runCoreDeployScript(
@@ -41,6 +44,10 @@ export async function runCoreDeployScript(
   if (image) {
     env.DEPLOYER_IMAGE = image;
   }
+
+  env.DEPLOYER_PORT_ENV_NAMES = resolvePortEnvNames(appEnv?.portEnvNames).join(
+    ',',
+  );
 
   const merged = mergeEnvVars(
     normalizeEnvVars(appEnv?.projectEnv),

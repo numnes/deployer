@@ -45,6 +45,7 @@ export default function ProjectSettingsClient() {
   const [instanceCount, setInstanceCount] = useState(0);
   const [gitUrl, setGitUrl] = useState('');
   const [serverUrl, setServerUrl] = useState('');
+  const [portEnvNamesText, setPortEnvNamesText] = useState('');
   const [activeLifetimeDays, setActiveLifetimeDays] = useState('');
   const [activeLifetimeHours, setActiveLifetimeHours] = useState('');
   const [existenceLifetimeDays, setExistenceLifetimeDays] = useState('');
@@ -67,6 +68,7 @@ export default function ProjectSettingsClient() {
       setProject(p);
       setGitUrl(p.gitUrl ?? '');
       setServerUrl(p.serverUrl ?? '');
+      setPortEnvNamesText((p.portEnvNames ?? []).join(', '));
       setActiveLifetimeDays(lifetimeFieldValue(p.maxActiveLifetimeDays));
       setActiveLifetimeHours(lifetimeFieldValue(p.maxActiveLifetimeHours));
       setExistenceLifetimeDays(lifetimeFieldValue(p.maxExistenceLifetimeDays));
@@ -157,9 +159,14 @@ export default function ProjectSettingsClient() {
                             return;
                           }
                           const trimmed = serverUrl.trim();
+                          const portExtras = portEnvNamesText
+                            .split(/[\n,]+/)
+                            .map((s) => s.trim())
+                            .filter(Boolean);
                           const updated = await patchProject(id, {
                             gitUrl: trimmedGit,
                             serverUrl: trimmed === '' ? null : trimmed,
+                            portEnvNames: portExtras,
                             maxActiveLifetimeDays: parseLifetimeField(activeLifetimeDays),
                             maxActiveLifetimeHours: parseLifetimeField(activeLifetimeHours),
                             maxExistenceLifetimeDays: parseLifetimeField(existenceLifetimeDays),
@@ -168,6 +175,7 @@ export default function ProjectSettingsClient() {
                           setProject(updated);
                           setGitUrl(updated.gitUrl);
                           setServerUrl(updated.serverUrl ?? '');
+                          setPortEnvNamesText((updated.portEnvNames ?? []).join(', '));
                           setActiveLifetimeDays(lifetimeFieldValue(updated.maxActiveLifetimeDays));
                           setActiveLifetimeHours(lifetimeFieldValue(updated.maxActiveLifetimeHours));
                           setExistenceLifetimeDays(
@@ -220,6 +228,28 @@ export default function ProjectSettingsClient() {
                           </span>
                           (PM2 app{' '}
                           <span className="font-mono text-white/75">{project.slug}-…</span>).
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="mb-1.5 block text-sm text-white/70">
+                          Port env names (optional extras)
+                        </label>
+                        <input
+                          className="input font-mono text-sm"
+                          value={portEnvNamesText}
+                          onChange={(e) => setPortEnvNamesText(e.target.value)}
+                          placeholder="HTTP_PORT, LISTEN_PORT"
+                        />
+                        <p className="mt-2 text-xs text-white/55">
+                          Always set on deploy:{' '}
+                          <span className="font-mono text-white/75">
+                            PORT, SERVER_PORT, APP_PORT
+                          </span>{' '}
+                          = allocated preview port. Add comma-separated extras if the app uses
+                          another name (e.g. Nest{' '}
+                          <span className="font-mono text-white/75">SERVER_PORT</span> is already
+                          covered).
                         </p>
                       </div>
 

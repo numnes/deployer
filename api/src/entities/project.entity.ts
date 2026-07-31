@@ -43,6 +43,13 @@ export class Project {
   @Column({ name: 'env_vars', type: 'jsonb', default: () => "'{}'" })
   envVars: Record<string, string>;
 
+  /**
+   * Nomes extras de env que recebem a porta alocada no deploy
+   * (além de PORT, SERVER_PORT, APP_PORT).
+   */
+  @Column({ name: 'port_env_names', type: 'jsonb', default: () => "'[]'" })
+  portEnvNames: string[];
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

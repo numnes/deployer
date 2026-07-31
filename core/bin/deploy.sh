@@ -101,6 +101,7 @@ pm2_start_with_env() {
   export _D_ECO_PORT="$port"
   export _D_ECO_ENV="$env_file"
   export _D_ECO_CWD="$app_cwd"
+  export _D_ECO_PORT_ENV_NAMES="${DEPLOYER_PORT_ENV_NAMES:-PORT,SERVER_PORT,APP_PORT}"
   python3 <<'PY'
 import json, os, re
 
@@ -141,8 +142,17 @@ if cwd:
     load_dotenv(os.path.join(cwd, ".env"), env)
 # Merge do dashboard / deployer.yaml env: (vence o .env do disco)
 load_dotenv(os.environ.get("_D_ECO_ENV") or "", env)
-# PORT do deployer sempre vence
-env["PORT"] = os.environ["_D_ECO_PORT"]
+# PORT do deployer sempre vence (nginx location aponta para ela).
+# Nomes: DEPLOYER_PORT_ENV_NAMES (defaults PORT,SERVER_PORT,APP_PORT + extras do projeto/yaml).
+port = os.environ["_D_ECO_PORT"]
+names_raw = (os.environ.get("_D_ECO_PORT_ENV_NAMES") or "").strip()
+names = [n.strip() for n in names_raw.split(",") if n.strip()]
+if not names:
+    names = ["PORT", "SERVER_PORT", "APP_PORT"]
+for key in names:
+    if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
+        env[key] = port
+env["PORT"] = port  # sempre
 app = {
     "name": os.environ["_D_ECO_NAME"],
     "script": os.environ["_D_ECO_SCRIPT"],
@@ -301,11 +311,39 @@ mapfile -t _parsed < <(parse_deployer_yaml "$TARGET_DIR")
 RUNNER="${_parsed[0]}"
 
 YAML_ENV_LINES=()
+YAML_PORT_ENV_NAMES=()
 for line in "${_parsed[@]}"; do
   if [[ "$line" == ENV:* ]]; then
     YAML_ENV_LINES+=("$line")
+  elif [[ "$line" == PORT_ENV:* ]]; then
+    YAML_PORT_ENV_NAMES+=("${line#PORT_ENV:}")
   fi
 done
+
+# Une defaults + API (projeto) + deployer.yaml
+DEFAULTS='PORT,SERVER_PORT,APP_PORT' \
+FROM_API="${DEPLOYER_PORT_ENV_NAMES:-}" \
+FROM_YAML="$(printf '%s\n' "${YAML_PORT_ENV_NAMES[@]}")" \
+DEPLOYER_PORT_ENV_NAMES="$(
+  python3 -c '
+import os, re
+KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+seen = set()
+out = []
+def add(s):
+    for part in (s or "").replace(";", ",").split(","):
+        k = part.strip()
+        if k and KEY.match(k) and k not in seen:
+            seen.add(k)
+            out.append(k)
+add(os.environ.get("DEFAULTS", ""))
+add(os.environ.get("FROM_API", ""))
+for a in (os.environ.get("FROM_YAML") or "").splitlines():
+    add(a)
+print(",".join(out))
+'
+)"
+export DEPLOYER_PORT_ENV_NAMES
 
 MERGED_ENV_FILE="$(mktemp "${DEPLOYER_STATE_DIR}/${NAME}.env.XXXXXX")"
 merge_app_env_file "$MERGED_ENV_FILE" "${YAML_ENV_LINES[@]}"

@@ -10,6 +10,12 @@ build:
 # Caminho relativo à raiz do repositório para o pm2 start.
 target: dist/main.js
 
+# Opcional: nomes extras de env que recebem a porta alocada
+# (sempre: PORT, SERVER_PORT, APP_PORT).
+# portEnvNames:
+#   - HTTP_PORT
+# # ou: portEnv: HTTP_PORT
+
 # Opcional: envs base no repositório (após build/target).
 # Merge no start: checkout `.env` → estas chaves → projeto/instância no dashboard.
 # env:

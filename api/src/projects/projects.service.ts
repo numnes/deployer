@@ -2,6 +2,9 @@ import { BadRequestException, Inject, Injectable, NotFoundException, forwardRef 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { isEnvVarsMap, normalizeEnvVars } from '../common/env-vars.util';
+import {
+  normalizePortEnvNamesInput,
+} from '../common/port-env-names.util';
 import { Project } from '../entities/project.entity';
 import { PreviewInstancesService } from '../preview-instances/preview-instances.service';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -22,6 +25,7 @@ export class ProjectsService {
       gitUrl: dto.gitUrl,
       serverUrl: dto.serverUrl?.trim() || null,
       envVars: {},
+      portEnvNames: [],
     });
     return this.repo.save(p);
   }
@@ -78,6 +82,15 @@ export class ProjectsService {
         );
       }
       p.envVars = normalizeEnvVars(dto.envVars);
+    }
+    if (dto.portEnvNames !== undefined) {
+      const normalized = normalizePortEnvNamesInput(dto.portEnvNames);
+      if (normalized == null) {
+        throw new BadRequestException(
+          'portEnvNames inválido: use nomes de env ([A-Za-z_][A-Za-z0-9_]*)',
+        );
+      }
+      p.portEnvNames = normalized;
     }
     return this.repo.save(p);
   }

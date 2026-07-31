@@ -7,6 +7,7 @@ Ephemeral **preview URLs** for code review and QA before merge:
 - **One URL per branch / PR** — e.g. `https://preview.example.com/my-app-feature-xyz/`
 - **Environment queue** — when the active slot limit is reached, new deploys stay `waiting` until a preview is paused or destroyed
 - **Project / instance env vars** — optional defaults per project (Settings), overridable per instance; applied on create/redeploy (merge: checkout `.env` if present → `deployer.yaml` `env:` → project → instance). PM2 starts with `cwd` = checkout root (so Nest/`dotenv` find `.env`) and injects the merged map into the process env; Docker via `--env-file`.
+- **Port env names** — on deploy, the allocated host port is written to `PORT`, `SERVER_PORT`, and `APP_PORT` by default. Add extras in **Project settings** or `deployer.yaml` (`portEnvNames` / `portEnv`) when the app uses another variable name.
 - **Pause / resume / redeploy** — per instance in the dashboard, or **Restart all instances** on a project
 - **Teardown on PR close** — optional workflow removes the instance automatically
 - **Bulk teardown** — **Projects → Settings → Teardown all instances** pauses every active instance for a project

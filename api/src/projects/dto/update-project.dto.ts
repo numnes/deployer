@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsInt,
   IsObject,
   IsOptional,
@@ -93,4 +94,14 @@ export class UpdateProjectDto {
   @IsOptional()
   @IsObject()
   envVars?: Record<string, string>;
+
+  @ApiPropertyOptional({
+    example: ['HTTP_PORT'],
+    description:
+      'Nomes extras de env que recebem a porta alocada (sempre inclui PORT, SERVER_PORT, APP_PORT).',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  portEnvNames?: string[];
 }

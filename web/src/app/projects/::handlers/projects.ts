@@ -13,6 +13,8 @@ export type Project = {
   maxExistenceLifetimeDays: number | null;
   maxExistenceLifetimeHours: number | null;
   envVars?: Record<string, string>;
+  /** Extras além de PORT, SERVER_PORT, APP_PORT */
+  portEnvNames?: string[];
   createdAt: string;
 } & NodeRef;
 
@@ -56,6 +58,7 @@ export async function patchProject(
     maxExistenceLifetimeDays?: number | null;
     maxExistenceLifetimeHours?: number | null;
     envVars?: Record<string, string>;
+    portEnvNames?: string[];
   },
 ): Promise<Project> {
   const token = getTokenClient();

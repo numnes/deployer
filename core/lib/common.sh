@@ -182,6 +182,18 @@ if isinstance(env_map, dict):
         # valor serializado sem quebra de linha no protocolo BUILD:/ENV:
         val = str(v).replace("\n", "\\n")
         print(f"ENV:{key}={val}")
+# portEnv / portEnvNames: extras além de PORT, SERVER_PORT, APP_PORT
+extras = d.get("portEnvNames")
+if extras is None:
+    extras = d.get("portEnv")
+if isinstance(extras, str):
+    extras = [extras]
+if isinstance(extras, list):
+    for n in extras:
+        key = str(n).strip()
+        if not key or not key.replace("_", "").isalnum() or key[0].isdigit():
+            continue
+        print(f"PORT_ENV:{key}")
 PY
 }
 
