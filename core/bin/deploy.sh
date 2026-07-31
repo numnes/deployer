@@ -193,6 +193,12 @@ deploy_pm2() {
   export PORT
   echo "$PORT" >"${DEPLOYER_STATE_DIR}/${NAME}.port"
 
+  # Para o processo ANTES do build: `npm run build` / `rimraf dist` apaga o
+  # target enquanto o PM2 antigo ainda aponta para ele → crash loop MODULE_NOT_FOUND
+  # se o build falhar depois (e stop_instance nunca rodar).
+  stop_instance "$NAME"
+  write_instance_runner "$NAME" "pm2"
+
   (
     cd "$TARGET_DIR"
     # Envs do dashboard / deployer.yaml disponíveis também no build.
@@ -210,11 +216,15 @@ deploy_pm2() {
   local abs_target="${TARGET_DIR}/${target}"
   if [[ ! -e "$abs_target" ]]; then
     echo "Target não encontrado: $abs_target" >&2
+    if [[ -d "${TARGET_DIR}/dist" ]]; then
+      echo "Arquivos main.js sob dist/:" >&2
+      find "${TARGET_DIR}/dist" -name 'main.js' 2>/dev/null | sed 's/^/  /' >&2 || true
+    else
+      echo "Pasta dist/ ausente — o build provavelmente falhou ou não gerou output." >&2
+    fi
     exit 1
   fi
 
-  stop_instance "$NAME"
-  write_instance_runner "$NAME" "pm2"
   # Após a seção de comandos (build) do deployer.yaml: aplica envs no start PM2.
   pm2_start_with_env "$abs_target" "$PORT" "$MERGED_ENV_FILE" "$TARGET_DIR"
 
