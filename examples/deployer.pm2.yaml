@@ -3,12 +3,14 @@ runner: pm2
 
 build:
   - npm ci
+  # Optional: materialize .env for apps that read it from cwd (Nest ConfigModule, etc.)
+  # - cp .env.dev .env
   - npm run build
 
 # Caminho relativo à raiz do repositório para o pm2 start.
 target: dist/main.js
 
 # Opcional: envs base no repositório (após build/target).
-# No deploy, o dashboard (projeto + override da instância) sobrescreve estas chaves.
+# Merge no start: checkout `.env` → estas chaves → projeto/instância no dashboard.
 # env:
 #   NODE_ENV: production

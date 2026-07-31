@@ -86,10 +86,12 @@ PY
 # Gera ecosystem temporário PM2 com env (PORT + merged dotenv).
 # O arquivo DEVE chamar-se ecosystem.config.js — se o path for
 # `name.eco.XXXX.js`, algumas versões do PM2 usam o filename como nome do app.
+# cwd = checkout do app para que Nest/dotenv encontrem `.env` na raiz do repo.
 pm2_start_with_env() {
   local abs_target="$1"
   local port="$2"
   local env_file="$3"
+  local app_cwd="${4:-}"
   local eco_dir eco
   eco_dir="$(mktemp -d "${DEPLOYER_STATE_DIR}/eco.XXXXXX")"
   eco="${eco_dir}/ecosystem.config.js"
@@ -98,17 +100,19 @@ pm2_start_with_env() {
   export _D_ECO_SCRIPT="$abs_target"
   export _D_ECO_PORT="$port"
   export _D_ECO_ENV="$env_file"
+  export _D_ECO_CWD="$app_cwd"
   python3 <<'PY'
 import json, os, re
 
 KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-env = {"PORT": os.environ["_D_ECO_PORT"]}
-path = os.environ.get("_D_ECO_ENV") or ""
-if path:
+
+def load_dotenv(path, into):
+    if not path:
+        return
     try:
         text = open(path, encoding="utf-8").read()
     except FileNotFoundError:
-        text = ""
+        return
     for line in text.splitlines():
         s = line.strip()
         if not s or s.startswith("#"):
@@ -128,7 +132,15 @@ if path:
                 .replace('\\"', '"')
                 .replace("\\\\", "\\")
             )
-        env[key] = val
+        into[key] = val
+
+env = {"PORT": os.environ["_D_ECO_PORT"]}
+cwd = (os.environ.get("_D_ECO_CWD") or "").strip()
+# .env no checkout (ex.: cp .env.dev .env no build) — base para o processo
+if cwd:
+    load_dotenv(os.path.join(cwd, ".env"), env)
+# Merge do dashboard / deployer.yaml env: (vence o .env do disco)
+load_dotenv(os.environ.get("_D_ECO_ENV") or "", env)
 # PORT do deployer sempre vence
 env["PORT"] = os.environ["_D_ECO_PORT"]
 app = {
@@ -136,6 +148,8 @@ app = {
     "script": os.environ["_D_ECO_SCRIPT"],
     "env": env,
 }
+if cwd:
+    app["cwd"] = cwd
 out = os.environ["_D_ECO_OUT"]
 with open(out, "w", encoding="utf-8") as f:
     f.write("module.exports = " + json.dumps({"apps": [app]}, ensure_ascii=False) + ";\n")
@@ -202,7 +216,7 @@ deploy_pm2() {
   stop_instance "$NAME"
   write_instance_runner "$NAME" "pm2"
   # Após a seção de comandos (build) do deployer.yaml: aplica envs no start PM2.
-  pm2_start_with_env "$abs_target" "$PORT" "$MERGED_ENV_FILE"
+  pm2_start_with_env "$abs_target" "$PORT" "$MERGED_ENV_FILE" "$TARGET_DIR"
 
   write_location_file "$LOCATIONS_DIR" "$LOCATION_BASENAME" "$PORT"
   nginx_reload
