@@ -11,6 +11,9 @@ else
 fi
 
 echo "[dev-down] Stopping containers..."
-docker compose -f "${ROOT_DIR}/docker-compose.dev.yml" down
+# Sempre no ROOT_DIR: se o cwd da shell ficou inacessível (SSH drop mid-restart),
+# `docker compose` falha com `stat .: permission denied`.
+cd "$ROOT_DIR"
+docker compose --project-directory "${ROOT_DIR}" -f "${ROOT_DIR}/docker-compose.dev.yml" down
 
 echo "[dev-down] OK"

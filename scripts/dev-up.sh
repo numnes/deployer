@@ -9,7 +9,8 @@ source "${ROOT_DIR}/scripts/lib/public-env.sh"
 load_deployer_public_env "$ROOT_DIR"
 
 compose() {
-  docker compose -f "${ROOT_DIR}/docker-compose.dev.yml" "$@"
+  # Project directory must be the install root (not the caller's cwd).
+  docker compose --project-directory "${ROOT_DIR}" -f "${ROOT_DIR}/docker-compose.dev.yml" "$@"
 }
 
 wait_for_http() {
