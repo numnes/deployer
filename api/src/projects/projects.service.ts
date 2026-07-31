@@ -48,6 +48,13 @@ export class ProjectsService {
 
   async update(id: string, dto: UpdateProjectDto) {
     const p = await this.findOne(id);
+    if (dto.gitUrl !== undefined) {
+      const trimmed = dto.gitUrl.trim();
+      if (!trimmed) {
+        throw new BadRequestException('gitUrl não pode ser vazio');
+      }
+      p.gitUrl = trimmed;
+    }
     if (dto.serverUrl !== undefined) {
       const trimmed = dto.serverUrl?.trim();
       p.serverUrl = trimmed ? trimmed : null;

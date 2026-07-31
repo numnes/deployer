@@ -43,6 +43,7 @@ export default function ProjectSettingsClient() {
   const [tab, setTab] = useState<ProjectTab>('general');
   const [project, setProject] = useState<Project | null>(null);
   const [instanceCount, setInstanceCount] = useState(0);
+  const [gitUrl, setGitUrl] = useState('');
   const [serverUrl, setServerUrl] = useState('');
   const [activeLifetimeDays, setActiveLifetimeDays] = useState('');
   const [activeLifetimeHours, setActiveLifetimeHours] = useState('');
@@ -64,6 +65,7 @@ export default function ProjectSettingsClient() {
     try {
       const [p, instances] = await Promise.all([getProject(id), listInstances()]);
       setProject(p);
+      setGitUrl(p.gitUrl ?? '');
       setServerUrl(p.serverUrl ?? '');
       setActiveLifetimeDays(lifetimeFieldValue(p.maxActiveLifetimeDays));
       setActiveLifetimeHours(lifetimeFieldValue(p.maxActiveLifetimeHours));
@@ -149,8 +151,14 @@ export default function ProjectSettingsClient() {
                         setActionMsg(null);
                         setSaving(true);
                         try {
+                          const trimmedGit = gitUrl.trim();
+                          if (!trimmedGit) {
+                            setError('Git URL is required.');
+                            return;
+                          }
                           const trimmed = serverUrl.trim();
                           const updated = await patchProject(id, {
+                            gitUrl: trimmedGit,
                             serverUrl: trimmed === '' ? null : trimmed,
                             maxActiveLifetimeDays: parseLifetimeField(activeLifetimeDays),
                             maxActiveLifetimeHours: parseLifetimeField(activeLifetimeHours),
@@ -158,6 +166,8 @@ export default function ProjectSettingsClient() {
                             maxExistenceLifetimeHours: parseLifetimeField(existenceLifetimeHours),
                           });
                           setProject(updated);
+                          setGitUrl(updated.gitUrl);
+                          setServerUrl(updated.serverUrl ?? '');
                           setActiveLifetimeDays(lifetimeFieldValue(updated.maxActiveLifetimeDays));
                           setActiveLifetimeHours(lifetimeFieldValue(updated.maxActiveLifetimeHours));
                           setExistenceLifetimeDays(
@@ -175,6 +185,22 @@ export default function ProjectSettingsClient() {
                         }
                       }}
                     >
+                      <div>
+                        <label className="mb-1.5 block text-sm text-white/70">Git URL</label>
+                        <input
+                          className="input"
+                          value={gitUrl}
+                          onChange={(e) => setGitUrl(e.target.value)}
+                          placeholder="https://github.com/org/repo.git"
+                          required
+                        />
+                        <p className="mt-2 text-xs text-white/55">
+                          Repository used for clone/fetch on deploy and redeploy. Changing this
+                          applies to new deploys; existing checkouts keep their remote until the
+                          next redeploy.
+                        </p>
+                      </div>
+
                       <div>
                         <label className="mb-1.5 block text-sm text-white/70">
                           Public URL (nginx domain)

@@ -49,6 +49,7 @@ export async function createProject(body: {
 export async function patchProject(
   id: string,
   body: {
+    gitUrl?: string;
     serverUrl?: string | null;
     maxActiveLifetimeDays?: number | null;
     maxActiveLifetimeHours?: number | null;

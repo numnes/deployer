@@ -8,10 +8,20 @@ import {
   IsUrl,
   Max,
   Min,
+  MinLength,
   ValidateIf,
 } from 'class-validator';
 
 export class UpdateProjectDto {
+  @ApiPropertyOptional({
+    example: 'https://github.com/yout-account/your-repo.git',
+    description: 'URL do repositório Git usada nos deploys (clone / fetch).',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  gitUrl?: string;
+
   @ApiPropertyOptional({
     example: 'https://meuteste.com',
     description:
