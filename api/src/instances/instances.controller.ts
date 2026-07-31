@@ -8,12 +8,22 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import type { UserRole } from '../auth/user-role';
+import {
+  redactInstanceEnvFields,
+  redactInstanceEnvList,
+} from '../common/redact-instance-env';
 import { UpdateInstanceDto } from './dto/update-instance.dto';
 import { InstancesService } from './instances.service';
+
+type AuthedUser = { userId: string; email: string; role: UserRole };
 
 @ApiTags('instances')
 @Controller('instances')
@@ -24,8 +34,12 @@ export class InstancesController {
   @ApiOkResponse({ description: 'Lista de instâncias (local + nós cluster)' })
   @UseGuards(JwtAuthGuard)
   @Get()
-  list() {
-    return this.instances.listForApi();
+  async list(@Req() req: { user: AuthedUser }) {
+    const rows = await this.instances.listForApi();
+    return redactInstanceEnvList(
+      rows as Record<string, unknown>[],
+      req.user?.role,
+    );
   }
 
   @ApiBearerAuth('jwt')
@@ -40,8 +54,11 @@ export class InstancesController {
   }
 
   @ApiBearerAuth('jwt')
-  @ApiOkResponse({ description: 'Atualiza override de env da instância' })
-  @UseGuards(JwtAuthGuard)
+  @ApiOkResponse({
+    description: 'Atualiza override de env da instância (admin only)',
+  })
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   @Patch(':id')
   patch(@Param('id') id: string, @Body() dto: UpdateInstanceDto) {
     return this.instances.update(id, dto);
@@ -75,7 +92,11 @@ export class InstancesController {
   @ApiOkResponse({ description: 'Detalhe de uma instância' })
   @UseGuards(JwtAuthGuard)
   @Get(':id')
-  getOne(@Param('id') id: string) {
-    return this.instances.getOneForApi(id);
+  async getOne(@Param('id') id: string, @Req() req: { user: AuthedUser }) {
+    const row = await this.instances.getOneForApi(id);
+    return redactInstanceEnvFields(
+      row as Record<string, unknown>,
+      req.user?.role,
+    );
   }
 }

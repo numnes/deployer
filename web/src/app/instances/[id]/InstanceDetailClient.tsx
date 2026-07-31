@@ -9,6 +9,7 @@ import { RequireAuth } from '@/components/RequireAuth';
 import { TabBar } from '@/components/TabBar';
 import { useToast } from '@/components/Toast';
 import { IconEnv, IconInfo, IconScrollText } from '@/components/icons';
+import { getUserClient, isAdmin } from '@/lib/client-auth';
 import { mergeEnvVars, normalizeEnvVars, type EnvVarsMap } from '@/lib/env-vars';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -41,6 +42,7 @@ export default function InstanceDetailClient() {
   const id = params.id;
   const router = useRouter();
   const toast = useToast();
+  const admin = isAdmin(getUserClient());
 
   const [tab, setTab] = useState<InstanceTab>('overview');
   const [row, setRow] = useState<InstanceRow | null>(null);
@@ -113,6 +115,12 @@ export default function InstanceDetailClient() {
     },
     [id, toast],
   );
+
+  useEffect(() => {
+    if (!admin && tab === 'environment') {
+      setTab('overview');
+    }
+  }, [admin, tab]);
 
   useEffect(() => {
     let alive = true;
@@ -385,7 +393,7 @@ export default function InstanceDetailClient() {
                       label: 'Overview',
                       icon: <IconInfo className="h-4 w-4" />,
                     },
-                    ...(row.isLocal
+                    ...(row.isLocal && admin
                       ? [
                           {
                             id: 'environment' as const,
@@ -592,7 +600,7 @@ export default function InstanceDetailClient() {
                   </>
                 ) : null}
 
-                {tab === 'environment' && row.isLocal ? (
+                {tab === 'environment' && row.isLocal && admin ? (
                   <>
                     <h2 className="text-sm font-medium text-[#e8eaed]">Environment overrides</h2>
                     <p className="mt-1 text-xs text-white/55">

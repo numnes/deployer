@@ -11,7 +11,7 @@ Useful for walkthroughs and for hosting a static copy on **GitHub Pages**.
 | User | Email | Password | Role |
 |------|-------|----------|------|
 | Admin | `admin@demo.local` | `demo` | full access |
-| Operator | `operator@demo.local` | `demo` | instances only |
+| Operator | `operator@demo.local` | `demo` | instances (no env view/edit) |
 
 ## Local (dev)
 

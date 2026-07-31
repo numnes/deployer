@@ -220,17 +220,23 @@ async function handleInstances(
   parts: string[],
   body: unknown,
   search: URLSearchParams,
-  _user: AuthUser,
+  user: AuthUser,
 ) {
   const s = getDemoStore();
+  const redactEnv = <T extends { envVars?: Record<string, string>; projectEnvVars?: Record<string, string> }>(
+    row: T,
+  ): T => {
+    if (user.role === 'admin') return row;
+    return { ...row, envVars: {}, projectEnvVars: {} };
+  };
   if (method === 'GET' && parts.length === 1) {
     await delay(120);
-    return s.instances;
+    return s.instances.map(redactEnv);
   }
   if (method === 'GET' && parts.length === 2) {
     const row = s.instances.find((i) => i.id === parts[1]);
     if (!row) throw new DemoHttpError(404, 'Instance not found');
-    return row;
+    return redactEnv(row);
   }
   if (method === 'GET' && parts.length === 3 && parts[2] === 'logs') {
     const id = parts[1];
@@ -244,6 +250,7 @@ async function handleInstances(
     };
   }
   if (method === 'PATCH' && parts.length === 2) {
+    requireAdmin(user);
     const row = s.instances.find((i) => i.id === parts[1]);
     if (!row) throw new DemoHttpError(404, 'Instance not found');
     if (!row.isLocal) throw new DemoHttpError(404, 'Remote env override not supported');
