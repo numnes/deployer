@@ -238,7 +238,7 @@ deploy_pm2() {
   # Após a seção de comandos (build) do deployer.yaml: aplica envs no start PM2.
   pm2_start_with_env "$abs_target" "$PORT" "$MERGED_ENV_FILE" "$TARGET_DIR"
 
-  write_location_file "$LOCATIONS_DIR" "$LOCATION_BASENAME" "$PORT"
+  write_location_file "$LOCATIONS_DIR" "$PROJECT_SLUG" "$BRANCH_SLUG" "$PORT"
   nginx_reload
   write_deploy_meta "pm2" "$PORT"
   log "OK deploy ${PROJECT_SLUG} branch ${BRANCH} -> porta ${PORT} pm2:${NAME}"
@@ -298,7 +298,7 @@ deploy_docker() {
     "${docker_env_args[@]}" \
     "$image_to_run" >/dev/null
 
-  write_location_file "$LOCATIONS_DIR" "$LOCATION_BASENAME" "$host_port"
+  write_location_file "$LOCATIONS_DIR" "$PROJECT_SLUG" "$BRANCH_SLUG" "$host_port"
   nginx_reload
   write_deploy_meta "docker" "$host_port"
   log "OK deploy ${PROJECT_SLUG} branch ${BRANCH} -> porta ${host_port} docker:${NAME}"

@@ -224,7 +224,7 @@ export default function ProjectSettingsClient() {
                           The public domain configured in nginx where preview instances are
                           available. Branch preview lives at{' '}
                           <span className="font-mono text-white/75">
-                            {'{URL}'}/{'{project-slug}-{branch-slug}'}/{' '}
+                            {'{URL}'}/{'{project-slug}'}/{'{branch-slug}'}/{' '}
                           </span>
                           (PM2 app{' '}
                           <span className="font-mono text-white/75">{project.slug}-…</span>).

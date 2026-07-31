@@ -212,8 +212,8 @@ function instanceBase(
     (online ? 'online' : partial.status === 'paused' ? 'stopped' : null);
   const previewUrl =
     partial.previewUrl ??
-    (partial.projectServerUrl
-      ? `${partial.projectServerUrl.replace(/\/+$/, '')}/${partial.pm2Name}/`
+    (partial.projectServerUrl && partial.projectSlug && partial.branchSlug
+      ? `${partial.projectServerUrl.replace(/\/+$/, '')}/${partial.projectSlug}/${partial.branchSlug}/`
       : null);
   return {
     ...partial,

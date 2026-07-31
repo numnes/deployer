@@ -11,3 +11,8 @@ export function sanitizeBranchSlug(branch: string): string {
 export function pm2AppName(projectSlug: string, branch: string): string {
   return `${projectSlug}-${sanitizeBranchSlug(branch)}`;
 }
+
+/** Path público nginx: `/<projectSlug>/<branchSlug>/` (PM2 continua com hífen). */
+export function previewUriPath(projectSlug: string, branch: string): string {
+  return `${projectSlug}/${sanitizeBranchSlug(branch)}`;
+}

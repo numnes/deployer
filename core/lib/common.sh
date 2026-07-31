@@ -101,9 +101,15 @@ next_free_port() {
 location_file_basename() {
   local project_slug="$1"
   local branch_slug="$2"
-  # Path público e arquivo de location usam <projectSlug>-<branchSlug> para
-  # evitar colisões entre projetos diferentes com branches de mesmo nome.
+  # Arquivo flat (include *.location); o path público é /<project>/<branch>/.
   echo "${project_slug}-${branch_slug}.location"
+}
+
+# Path HTTP público: /<projectSlug>/<branchSlug>/
+preview_uri_path() {
+  local project_slug="$1"
+  local branch_slug="$2"
+  echo "${project_slug}/${branch_slug}"
 }
 
 nginx_reload() {
@@ -116,11 +122,15 @@ nginx_reload() {
 
 write_location_file() {
   local locations_dir="$1"
-  local location_basename="$2"
-  local port="$3"
-  local path="$locations_dir/${location_basename}"
+  local project_slug="$2"
+  local branch_slug="$3"
+  local port="$4"
+  local location_basename uri_path path
+  location_basename="$(location_file_basename "$project_slug" "$branch_slug")"
+  uri_path="$(preview_uri_path "$project_slug" "$branch_slug")"
+  path="$locations_dir/${location_basename}"
   cat >"$path" <<EOF
-location ^~ /${location_basename%.location}/ {
+location ^~ /${uri_path}/ {
     proxy_pass http://127.0.0.1:${port}/;
     proxy_http_version 1.1;
     proxy_set_header Upgrade \$http_upgrade;

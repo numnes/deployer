@@ -2,7 +2,7 @@ import type { Project } from '@/app/projects/::handlers/projects';
 
 /**
  * Nome PM2 do core: `<slug>-<branch-slug-sanitizado>`.
- * URL nginx: `<serverUrl>/<projectSlug>-<branchSlug>/` (== `<serverUrl>/<pm2Name>/`).
+ * URL nginx: `<serverUrl>/<projectSlug>/<branchSlug>/`.
  */
 export function previewUrlFromPm2Name(
   pm2Name: string,
@@ -15,7 +15,7 @@ export function previewUrlFromPm2Name(
       const branchSlug = pm2Name.slice(prefix.length);
       if (!p.serverUrl?.trim() || !branchSlug) return null;
       const base = p.serverUrl.replace(/\/+$/, '');
-      return `${base}/${pm2Name}/`;
+      return `${base}/${p.slug}/${branchSlug}/`;
     }
   }
   return null;

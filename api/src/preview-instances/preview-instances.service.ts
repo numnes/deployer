@@ -27,7 +27,7 @@ import {
   runCorePauseScript,
   type DeployAppEnvInput,
 } from '../deploy/deploy-exec.helper';
-import { pm2AppName, sanitizeBranchSlug } from '../deploy/pm2-name.util';
+import { pm2AppName, sanitizeBranchSlug, previewUriPath } from '../deploy/pm2-name.util';
 import { PreviewInstance } from '../entities/preview-instance.entity';
 import { PreviewInstanceStatusEvent } from '../entities/preview-instance-status-event.entity';
 import { ProjectsService } from '../projects/projects.service';
@@ -416,8 +416,8 @@ export class PreviewInstancesService {
     const runtime = this.resolveRuntime(r, maps);
     const base = r.project?.serverUrl?.trim();
     const previewUrl =
-      base && r.pm2Name
-        ? `${base.replace(/\/+$/, '')}/${r.pm2Name}/`
+      base && r.project?.slug && r.branchSlug
+        ? `${base.replace(/\/+$/, '')}/${previewUriPath(r.project.slug, r.branch)}/`
         : null;
     const project = r.project;
     const activeExpiresAt =
