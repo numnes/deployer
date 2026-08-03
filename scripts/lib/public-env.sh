@@ -8,6 +8,7 @@
 #   DEPLOYER_API_PORT / DEPLOYER_WEB_PORT / DEPLOYER_POSTGRES_PORT / DEPLOYER_REDIS_PORT
 #     → pin host ports (skip auto-pick); fails if the port is already in use
 #   DEPLOYER_VERSION → shown in the dashboard sidebar (defaults to git describe)
+#   DEPLOYER_DEPLOY_CONCURRENCY → parallel BullMQ deploy jobs (default 3)
 
 load_deployer_public_env() {
   local root="${1:-}"

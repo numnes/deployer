@@ -13,7 +13,7 @@ import { execFile } from 'child_process';
 import { join } from 'path';
 import { promisify } from 'util';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import {
   isEnvVarsMap,
   normalizeEnvVars,
@@ -116,16 +116,33 @@ export class PreviewInstancesService {
     private readonly projects: ProjectsService,
     private readonly settings: SettingsService,
     private readonly config: ConfigService,
+    private readonly dataSource: DataSource,
     @InjectQueue('deploy')
     private readonly deployQueue: Queue<DeployJobPayload>,
   ) {}
 
   private async enqueueRedeployJob(projectSlug: string, branch: string, gitUrl: string) {
-    await this.deployQueue.add('create', {
-      projectSlug,
-      branch,
-      gitUrl,
-    });
+    const branchSlug = sanitizeBranchSlug(branch);
+    const jobId = `deploy:${projectSlug}:${branchSlug}`;
+    try {
+      await this.deployQueue.add(
+        'create',
+        { projectSlug, branch, gitUrl },
+        {
+          jobId,
+          removeOnComplete: true,
+          removeOnFail: true,
+        },
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Job já na fila (mesmo jobId) — ok sob concorrência / processWaitingQueue.
+      if (/already exists|Job.*exist/i.test(msg)) {
+        this.log.debug(`Deploy job já enfileirado: ${jobId}`);
+        return;
+      }
+      throw e;
+    }
   }
   private async appendEvent(
     instanceId: string,
@@ -156,6 +173,152 @@ export class PreviewInstancesService {
 
   async countActiveSlots(): Promise<number> {
     return this.repo.count({ where: { status: 'active' } });
+  }
+
+  /** Slots ocupados: active + deploying (reserva enquanto o build/start roda). */
+  async countOccupiedSlots(): Promise<number> {
+    return this.repo.count({
+      where: { status: In(['active', 'deploying']) },
+    });
+  }
+
+  /**
+   * Reserva atômica de slot (advisory lock) antes do shell de deploy.
+   * Conta active+deploying. Mesma branch já active/deploying reusa o slot.
+   * Sem vaga → status waiting e retorna 'queued'.
+   */
+  async reserveDeployOrQueue(
+    projectSlug: string,
+    branch: string,
+  ): Promise<'queued' | 'run'> {
+    const max = await this.settings.getMaxActiveInstances();
+    const branchSlug = sanitizeBranchSlug(branch);
+    const pm2Name = pm2AppName(projectSlug, branch);
+
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        `SELECT pg_advisory_xact_lock(hashtext('deployer-slot-reserve'))`,
+      );
+
+      const project = await this.projects.getBySlug(projectSlug);
+      const repo = manager.getRepository(PreviewInstance);
+      const eventsRepo = manager.getRepository(PreviewInstanceStatusEvent);
+      let row = await repo.findOne({
+        where: { projectId: project.id, branch },
+      });
+
+      const occupiesSlot =
+        !!row && (row.status === 'active' || row.status === 'deploying');
+      const occupied = await repo.count({
+        where: { status: In(['active', 'deploying']) },
+      });
+
+      if (!occupiesSlot && occupied >= max) {
+        if (!row) {
+          row = repo.create({
+            projectId: project.id,
+            branch,
+            branchSlug,
+            pm2Name,
+            port: null,
+            status: 'waiting',
+            idleSleep: false,
+          });
+          await repo.save(row);
+          await eventsRepo.save(
+            eventsRepo.create({
+              instanceId: row.id,
+              oldStatus: null,
+              newStatus: 'waiting',
+            }),
+          );
+        } else if (row.status !== 'waiting') {
+          const prev = row.status;
+          row.branchSlug = branchSlug;
+          row.pm2Name = pm2Name;
+          row.status = 'waiting';
+          await repo.save(row);
+          await eventsRepo.save(
+            eventsRepo.create({
+              instanceId: row.id,
+              oldStatus: prev,
+              newStatus: 'waiting',
+            }),
+          );
+        } else {
+          row.branchSlug = branchSlug;
+          row.pm2Name = pm2Name;
+          await repo.save(row);
+        }
+        this.log.log(
+          `Deploy enfileirado (waiting) ${projectSlug}/${branch} — ocupados ${occupied}/${max}`,
+        );
+        return 'queued';
+      }
+
+      if (!row) {
+        row = repo.create({
+          projectId: project.id,
+          branch,
+          branchSlug,
+          pm2Name,
+          port: null,
+          status: 'deploying',
+          lastDeployError: null,
+          idleSleep: false,
+        });
+        await repo.save(row);
+        await eventsRepo.save(
+          eventsRepo.create({
+            instanceId: row.id,
+            oldStatus: null,
+            newStatus: 'deploying',
+          }),
+        );
+      } else {
+        const prev = row.status;
+        row.branchSlug = branchSlug;
+        row.pm2Name = pm2Name;
+        row.lastDeployError = null;
+        row.idleSleep = false;
+        if (prev !== 'deploying') {
+          row.status = 'deploying';
+          await repo.save(row);
+          await eventsRepo.save(
+            eventsRepo.create({
+              instanceId: row.id,
+              oldStatus: prev,
+              newStatus: 'deploying',
+            }),
+          );
+        } else {
+          await repo.save(row);
+        }
+      }
+      return 'run';
+    });
+  }
+
+  /** @deprecated use reserveDeployOrQueue */
+  async classifyDeployOrQueue(
+    projectSlug: string,
+    branch: string,
+  ): Promise<'queued' | 'run_shell'> {
+    const r = await this.reserveDeployOrQueue(projectSlug, branch);
+    return r === 'queued' ? 'queued' : 'run_shell';
+  }
+
+  /** @deprecated prefer reserveDeployOrQueue */
+  async markDeploying(projectSlug: string, branch: string): Promise<PreviewInstance> {
+    await this.reserveDeployOrQueue(projectSlug, branch);
+    const project = await this.projects.getBySlug(projectSlug);
+    const row = await this.repo.findOne({
+      where: { projectId: project.id, branch },
+    });
+    if (!row) {
+      throw new Error('Instância não encontrada após reserveDeployOrQueue');
+    }
+    return row;
   }
 
   /** Envs do projeto (+ override da instância se já existir) para o shell de deploy. */
@@ -189,81 +352,6 @@ export class PreviewInstancesService {
     const maps = await this.fetchRuntimeMaps();
     const fresh = await this.repo.findOne({ where: { id }, relations: ['project'] });
     return this.buildListItem(fresh as PreviewInstance, maps);
-  }
-
-  /**
-   * Antes de rodar o shell: se limite global atingido e esta branch não está
-   * já como active, registra (ou atualiza) como waiting e não executa deploy.
-   * Caso contrário retorna que o shell deve rodar (deploy / redeploy).
-   */
-  async classifyDeployOrQueue(
-    projectSlug: string,
-    branch: string,
-  ): Promise<'queued' | 'run_shell'> {
-    const project = await this.projects.getBySlug(projectSlug);
-    const branchSlug = sanitizeBranchSlug(branch);
-    const pm2Name = pm2AppName(projectSlug, branch);
-    const max = await this.settings.getMaxActiveInstances();
-    const activeSlots = await this.countActiveSlots();
-    let row = await this.repo.findOne({
-      where: { projectId: project.id, branch },
-    });
-
-    const thisBranchIsActive = row?.status === 'active';
-    if (activeSlots >= max && !thisBranchIsActive) {
-      if (!row) {
-        row = this.repo.create({
-          projectId: project.id,
-          branch,
-          branchSlug,
-          pm2Name,
-          port: null,
-          status: 'waiting',
-        });
-        await this.repo.save(row);
-        await this.appendEvent(row.id, null, 'waiting');
-      } else {
-        row.branchSlug = branchSlug;
-        row.pm2Name = pm2Name;
-        await this.repo.save(row);
-        await this.setStatus(row, 'waiting');
-      }
-      this.log.log(
-        `Deploy enfileirado (waiting) ${projectSlug}/${branch} — limite ${max} ativo(s)`,
-      );
-      return 'queued';
-    }
-    return 'run_shell';
-  }
-
-  /** Marca deploying antes do shell (cria linha se não existir). */
-  async markDeploying(projectSlug: string, branch: string): Promise<PreviewInstance> {
-    const project = await this.projects.getBySlug(projectSlug);
-    const branchSlug = sanitizeBranchSlug(branch);
-    const pm2Name = pm2AppName(projectSlug, branch);
-    let row = await this.repo.findOne({
-      where: { projectId: project.id, branch },
-    });
-    if (!row) {
-      row = this.repo.create({
-        projectId: project.id,
-        branch,
-        branchSlug,
-        pm2Name,
-        port: null,
-        status: 'deploying',
-        lastDeployError: null,
-      });
-      await this.repo.save(row);
-      await this.appendEvent(row.id, null, 'deploying');
-    } else {
-      row.branchSlug = branchSlug;
-      row.pm2Name = pm2Name;
-      row.lastDeployError = null;
-      await this.repo.save(row);
-      await this.setStatus(row, 'deploying');
-    }
-    return row;
   }
 
   async finalizeDeploySuccess(meta: DeployMeta): Promise<PreviewInstance> {
@@ -304,35 +392,30 @@ export class PreviewInstancesService {
     }
   }
 
-  /** Tenta subir instâncias waiting enquanto houver vaga. */
+  /**
+   * Enfileira deploys para instâncias waiting enquanto houver vaga livre
+   * (max - occupied). O worker reserva o slot atomicamente ao processar o job.
+   */
   async processWaitingQueue(): Promise<void> {
     const max = await this.settings.getMaxActiveInstances();
-    while ((await this.countActiveSlots()) < max) {
-      const next = await this.repo.findOne({
-        where: { status: 'waiting' },
-        relations: ['project'],
-        order: { createdAt: 'ASC' },
-      });
-      if (!next?.project) break;
-      const gitUrl = next.project.gitUrl;
-      const slug = next.project.slug;
-      try {
-        await this.setStatus(next, 'deploying');
-        const appEnv = await this.resolveDeployAppEnv(slug, next.branch);
-        const meta = await runCoreDeployScript(
-          this.config,
-          slug,
-          gitUrl,
-          next.branch,
-          undefined,
-          appEnv,
-        );
-        await this.finalizeDeploySuccess(meta);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        this.log.error(`Fila waiting falhou (${slug}/${next.branch}): ${msg}`);
-        await this.finalizeDeployError(slug, next.branch, formatDeployError(e));
-      }
+    const occupied = await this.countOccupiedSlots();
+    const free = max - occupied;
+    if (free <= 0) return;
+
+    const waiting = await this.repo.find({
+      where: { status: 'waiting' },
+      relations: ['project'],
+      order: { createdAt: 'ASC' },
+      take: free,
+    });
+
+    for (const next of waiting) {
+      if (!next.project) continue;
+      await this.enqueueRedeployJob(
+        next.project.slug,
+        next.branch,
+        next.project.gitUrl,
+      );
     }
   }
 
@@ -609,17 +692,12 @@ export class PreviewInstancesService {
       );
     }
 
-    const max = await this.settings.getMaxActiveInstances();
-    const active = await this.countActiveSlots();
-    if (active >= max) {
+    const reserved = await this.reserveDeployOrQueue(projectSlug, row.branch);
+    if (reserved === 'queued') {
       throw new BadRequestException(
-        `Sem slot livre para wake (max active=${max})`,
+        `Sem slot livre para wake (max active atingido)`,
       );
     }
-
-    row.lastDeployError = null;
-    await this.repo.save(row);
-    await this.setStatus(row, 'deploying');
 
     try {
       const appEnv = await this.resolveDeployAppEnv(projectSlug, row.branch);
@@ -657,43 +735,35 @@ export class PreviewInstancesService {
     });
     if (!row?.project) throw new NotFoundException();
 
-    const enqueueAndReturn = async () => {
-      row.lastDeployError = null;
-      await this.repo.save(row);
-      await this.setStatus(row, 'deploying');
-      await this.enqueueRedeployJob(row.project.slug, row.branch, row.project.gitUrl);
-      const maps = await this.fetchRuntimeMaps();
-      const fresh = await this.repo.findOne({ where: { id }, relations: ['project'] });
-      return this.buildListItem(fresh as PreviewInstance, maps);
-    };
-
-    if (row.status === 'active') {
-      // Redeploy via fila BullMQ — não bloqueia o HTTP (build docker/pm2 pode demorar).
-      return enqueueAndReturn();
-    }
-
     if (
-      row.status === 'waiting' ||
-      row.status === 'paused' ||
-      row.status === 'error'
+      !['active', 'waiting', 'paused', 'error'].includes(row.status)
     ) {
-      const max = await this.settings.getMaxActiveInstances();
-      const active = await this.countActiveSlots();
-      if (active >= max) {
-        await this.setStatus(row, 'waiting');
-        const maps = await this.fetchRuntimeMaps();
-        const fresh = await this.repo.findOne({
-          where: { id },
-          relations: ['project'],
-        });
-        return this.buildListItem(fresh as PreviewInstance, maps);
-      }
-      return enqueueAndReturn();
+      throw new BadRequestException(
+        `Estado "${row.status}" não suporta ativação forçada agora`,
+      );
     }
 
-    throw new BadRequestException(
-      `Estado "${row.status}" não suporta ativação forçada agora`,
+    row.lastDeployError = null;
+    await this.repo.save(row);
+
+    const reserved = await this.reserveDeployOrQueue(
+      row.project.slug,
+      row.branch,
     );
+    if (reserved === 'run') {
+      await this.enqueueRedeployJob(
+        row.project.slug,
+        row.branch,
+        row.project.gitUrl,
+      );
+    }
+
+    const maps = await this.fetchRuntimeMaps();
+    const fresh = await this.repo.findOne({
+      where: { id },
+      relations: ['project'],
+    });
+    return this.buildListItem(fresh as PreviewInstance, maps);
   }
   async findAllByProjectId(projectId: string): Promise<PreviewInstance[]> {
     return this.repo.find({

@@ -6,6 +6,7 @@ import { execFile } from 'child_process';
 import { join } from 'path';
 import { promisify } from 'util';
 import { PreviewInstancesService } from '../preview-instances/preview-instances.service';
+import { resolveDeployConcurrency } from './deploy-concurrency.util';
 import { runCoreDeployScript } from './deploy-exec.helper';
 import { formatDeployError } from './format-deploy-error';
 
@@ -18,7 +19,7 @@ export type DeployJobPayload = {
   image?: string;
 };
 
-@Processor('deploy')
+@Processor('deploy', { concurrency: resolveDeployConcurrency() })
 export class DeployProcessor extends WorkerHost {
   private readonly logger = new Logger(DeployProcessor.name);
 
@@ -27,6 +28,9 @@ export class DeployProcessor extends WorkerHost {
     private readonly previewInstances: PreviewInstancesService,
   ) {
     super();
+    this.logger.log(
+      `Deploy worker concurrency=${resolveDeployConcurrency(this.config.get<string>('DEPLOYER_DEPLOY_CONCURRENCY'))}`,
+    );
   }
 
   async process(job: Job<DeployJobPayload>) {
@@ -48,18 +52,14 @@ export class DeployProcessor extends WorkerHost {
   }
 
   async createAction(job: Job<DeployJobPayload>) {
-    const queued = await this.previewInstances.classifyDeployOrQueue(
+    const reserved = await this.previewInstances.reserveDeployOrQueue(
       job.data.projectSlug,
       job.data.branch,
     );
-    if (queued === 'queued') {
+    if (reserved === 'queued') {
       return { ok: true, action: 'queued' };
     }
 
-    await this.previewInstances.markDeploying(
-      job.data.projectSlug,
-      job.data.branch,
-    );
     try {
       const appEnv = await this.previewInstances.resolveDeployAppEnv(
         job.data.projectSlug,

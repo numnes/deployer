@@ -112,4 +112,12 @@ else
 fi
 set_env_var CORS_ORIGIN "$cors_origin"
 
+# Parallel deploy jobs (BullMQ worker concurrency). Default 3 if unset/invalid.
+concurrency_raw="${DEPLOYER_DEPLOY_CONCURRENCY:-}"
+if [[ -n "$concurrency_raw" ]]; then
+  set_env_var DEPLOYER_DEPLOY_CONCURRENCY "$concurrency_raw"
+elif [[ -z "$(get_env_var DEPLOYER_DEPLOY_CONCURRENCY || true)" ]]; then
+  set_env_var DEPLOYER_DEPLOY_CONCURRENCY "3"
+fi
+
 echo "[ensure-env] api/.env updated (API :${API_PORT}, Postgres :${POSTGRES_PORT}, Redis :${REDIS_PORT}, Web :${WEB_PORT}, CORS :${cors_origin})"

@@ -22,6 +22,7 @@ deployer restart
 | `DEPLOYER_POSTGRES_PORT`        | Pin Postgres publish port                                               |
 | `DEPLOYER_REDIS_PORT`           | Pin Redis publish port                                                  |
 | `DEPLOYER_VERSION`              | Label in the dashboard sidebar (default: `git describe --tags`)         |
+| `DEPLOYER_DEPLOY_CONCURRENCY`   | Parallel deploy jobs in BullMQ (default `3`; slot limit still enforced) |
 
 Example (UI at `/`, API under `/api/` on the same host, stable local ports for nginx):
 
@@ -43,6 +44,7 @@ If `deployer.env` is absent, defaults stay on `http://localhost:<ports>` and por
 | `DEPLOYER_WORK_ROOT`        | Where branch checkouts live on disk                                                                 |
 | `DEPLOYER_CORE_DIR`         | Path to `core/`                                                                                     |
 | `DEPLOYER_LOCATIONS_DIR`    | nginx `*.location` files (default `~/deployer/locations`)                                           |
+| `DEPLOYER_DEPLOY_CONCURRENCY` | Parallel BullMQ deploy workers (default 3; written from `deployer.env` on setup/restart)          |
 | `JWT_SECRET`                | Auth tokens (auto-generated on first setup)                                                         |
 | `DEPLOYER_SETUP_KEY`        | Root-only key for privileged bootstrap endpoints (auto-generated)                                   |
 | `DEPLOYER_CLUSTER_SECRET`   | Encrypts connected-node cluster keys in Postgres (auto-generated; must stay stable across restarts) |
