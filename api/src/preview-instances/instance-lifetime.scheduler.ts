@@ -12,9 +12,9 @@ export class InstanceLifetimeScheduler {
   async enforceLifetimes() {
     try {
       const result = await this.previewInstances.enforceLifetimeLimits();
-      if (result.paused > 0 || result.destroyed > 0) {
+      if (result.paused > 0 || result.destroyed > 0 || result.idleSlept > 0) {
         this.log.log(
-          `Lifetime enforcement: ${result.paused} paused, ${result.destroyed} destroyed`,
+          `Lifetime enforcement: ${result.paused} paused, ${result.destroyed} destroyed, ${result.idleSlept} idle-slept`,
         );
       }
     } catch (e) {

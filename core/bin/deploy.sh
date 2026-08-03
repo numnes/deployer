@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Uso: deploy.sh <slug-projeto> <url-git> <branch>
+# Uso:
+#   deploy.sh <slug-projeto> <url-git> <branch>
+#   deploy.sh --resume <slug-projeto> <branch>   # sobe PM2 sem clone/build (wake)
 # Env opcional:
 #   DEPLOYER_IMAGE=<registry/image:tag> (modo docker remoto)
 #   DEPLOYER_APP_ENV_FILE=<path> (.env do dashboard: projeto + override da instância)
@@ -10,6 +12,7 @@ source "${SCRIPT_DIR}/../lib/common.sh"
 
 usage() {
   echo "Uso: $0 <slug-projeto> <url-git> <branch>" >&2
+  echo "     $0 --resume <slug-projeto> <branch>" >&2
   exit 1
 }
 
@@ -17,11 +20,20 @@ log() {
   echo "$1" >&2
 }
 
-[[ $# -ge 3 ]] || usage
-
-PROJECT_SLUG="$1"
-GIT_URL="$2"
-BRANCH="$3"
+RESUME_ONLY=0
+GIT_URL=""
+if [[ "${1:-}" == "--resume" ]]; then
+  RESUME_ONLY=1
+  shift
+  [[ $# -ge 2 ]] || usage
+  PROJECT_SLUG="$1"
+  BRANCH="$2"
+else
+  [[ $# -ge 3 ]] || usage
+  PROJECT_SLUG="$1"
+  GIT_URL="$2"
+  BRANCH="$3"
+fi
 BRANCH_SLUG="$(sanitize_branch_slug "$BRANCH")"
 LOCATION_BASENAME="$(location_file_basename "$PROJECT_SLUG" "$BRANCH_SLUG")"
 
@@ -209,19 +221,23 @@ deploy_pm2() {
   stop_instance "$NAME"
   write_instance_runner "$NAME" "pm2"
 
-  (
-    cd "$TARGET_DIR"
-    # Envs do dashboard / deployer.yaml disponíveis também no build.
-    if [[ -n "$MERGED_ENV_FILE" && -s "$MERGED_ENV_FILE" ]]; then
-      # shellcheck disable=SC1090
-      eval "$(exports_from_dotenv_file "$MERGED_ENV_FILE")"
-    fi
-    export PORT
-    for cmd in "${build_cmds[@]}"; do
-      log "[deploy] build: $cmd"
-      bash -lc "$cmd" >&2
-    done
-  )
+  if [[ "$RESUME_ONLY" -eq 0 ]]; then
+    (
+      cd "$TARGET_DIR"
+      # Envs do dashboard / deployer.yaml disponíveis também no build.
+      if [[ -n "$MERGED_ENV_FILE" && -s "$MERGED_ENV_FILE" ]]; then
+        # shellcheck disable=SC1090
+        eval "$(exports_from_dotenv_file "$MERGED_ENV_FILE")"
+      fi
+      export PORT
+      for cmd in "${build_cmds[@]}"; do
+        log "[deploy] build: $cmd"
+        bash -lc "$cmd" >&2
+      done
+    )
+  else
+    log "[resume] skipping build (wake)"
+  fi
 
   local abs_target="${TARGET_DIR}/${target}"
   if [[ ! -e "$abs_target" ]]; then
@@ -241,7 +257,11 @@ deploy_pm2() {
   write_location_file "$LOCATIONS_DIR" "$PROJECT_SLUG" "$BRANCH_SLUG" "$PORT"
   nginx_reload
   write_deploy_meta "pm2" "$PORT"
-  log "OK deploy ${PROJECT_SLUG} branch ${BRANCH} -> porta ${PORT} pm2:${NAME}"
+  if [[ "$RESUME_ONLY" -eq 1 ]]; then
+    log "OK resume ${PROJECT_SLUG} branch ${BRANCH} -> porta ${PORT} pm2:${NAME}"
+  else
+    log "OK deploy ${PROJECT_SLUG} branch ${BRANCH} -> porta ${PORT} pm2:${NAME}"
+  fi
 }
 
 deploy_docker() {
@@ -304,11 +324,23 @@ deploy_docker() {
   log "OK deploy ${PROJECT_SLUG} branch ${BRANCH} -> porta ${host_port} docker:${NAME}"
 }
 
-# Sempre clona/atualiza para ler deployer.yaml (e para build local).
-clone_or_update_repo
+# Sempre clona/atualiza para ler deployer.yaml (e para build local), exceto no wake.
+if [[ "$RESUME_ONLY" -eq 1 ]]; then
+  if [[ ! -d "$TARGET_DIR" ]]; then
+    echo "Resume falhou: checkout ausente em ${TARGET_DIR}" >&2
+    exit 1
+  fi
+else
+  clone_or_update_repo
+fi
 
 mapfile -t _parsed < <(parse_deployer_yaml "$TARGET_DIR")
 RUNNER="${_parsed[0]}"
+
+if [[ "$RESUME_ONLY" -eq 1 && "$RUNNER" != "pm2" ]]; then
+  echo "Resume rápido só é suportado para runner pm2 (atual: ${RUNNER})." >&2
+  exit 1
+fi
 
 YAML_ENV_LINES=()
 YAML_PORT_ENV_NAMES=()

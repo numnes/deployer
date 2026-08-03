@@ -22,7 +22,12 @@ export type InstanceRow = {
   active: boolean;
   /** @deprecated use runtimeStatus */
   pm2Status: string | null;
-  monit?: { memory?: number; cpu?: number } | null;
+  monit?: {
+    memory?: number;
+    cpu?: number;
+    cpuPerCore?: number;
+    hostCores?: number;
+  } | null;
   previewUrl: string | null;
   lastDeployError: string | null;
   activeExpiresAt: string | null;

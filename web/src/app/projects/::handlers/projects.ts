@@ -12,6 +12,8 @@ export type Project = {
   maxActiveLifetimeHours: number | null;
   maxExistenceLifetimeDays: number | null;
   maxExistenceLifetimeHours: number | null;
+  /** null/omit = disabled. Minutes without HTTP before idle sleep. */
+  idlePauseMinutes?: number | null;
   envVars?: Record<string, string>;
   /** Extras além de PORT, SERVER_PORT, APP_PORT */
   portEnvNames?: string[];
@@ -57,6 +59,7 @@ export async function patchProject(
     maxActiveLifetimeHours?: number | null;
     maxExistenceLifetimeDays?: number | null;
     maxExistenceLifetimeHours?: number | null;
+    idlePauseMinutes?: number | null;
     envVars?: Record<string, string>;
     portEnvNames?: string[];
   },

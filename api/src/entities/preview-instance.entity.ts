@@ -55,6 +55,13 @@ export class PreviewInstance {
   activatedAt: Date | null;
 
   /**
+   * true = pausada por idle (nginx aponta para wake); false = pause manual / lifetime.
+   * Wake sob demanda só se aplica quando true.
+   */
+  @Column({ name: 'idle_sleep', type: 'boolean', default: false })
+  idleSleep: boolean;
+
+  /**
    * Override de env por instância (sobrescreve as do projeto no merge do deploy).
    * Objeto vazio = sem override.
    */

@@ -50,6 +50,7 @@ export default function ProjectSettingsClient() {
   const [activeLifetimeHours, setActiveLifetimeHours] = useState('');
   const [existenceLifetimeDays, setExistenceLifetimeDays] = useState('');
   const [existenceLifetimeHours, setExistenceLifetimeHours] = useState('');
+  const [idlePauseMinutes, setIdlePauseMinutes] = useState('');
   const [envVars, setEnvVars] = useState<EnvVarsMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -73,6 +74,7 @@ export default function ProjectSettingsClient() {
       setActiveLifetimeHours(lifetimeFieldValue(p.maxActiveLifetimeHours));
       setExistenceLifetimeDays(lifetimeFieldValue(p.maxExistenceLifetimeDays));
       setExistenceLifetimeHours(lifetimeFieldValue(p.maxExistenceLifetimeHours));
+      setIdlePauseMinutes(lifetimeFieldValue(p.idlePauseMinutes));
       setEnvVars(normalizeEnvVars(p.envVars));
       setInstanceCount(instances.filter((i) => i.projectId === id).length);
     } catch {
@@ -171,6 +173,7 @@ export default function ProjectSettingsClient() {
                             maxActiveLifetimeHours: parseLifetimeField(activeLifetimeHours),
                             maxExistenceLifetimeDays: parseLifetimeField(existenceLifetimeDays),
                             maxExistenceLifetimeHours: parseLifetimeField(existenceLifetimeHours),
+                            idlePauseMinutes: parseLifetimeField(idlePauseMinutes),
                           });
                           setProject(updated);
                           setGitUrl(updated.gitUrl);
@@ -184,6 +187,7 @@ export default function ProjectSettingsClient() {
                           setExistenceLifetimeHours(
                             lifetimeFieldValue(updated.maxExistenceLifetimeHours),
                           );
+                          setIdlePauseMinutes(lifetimeFieldValue(updated.idlePauseMinutes));
                           setSaved(true);
                           router.refresh();
                         } catch {
@@ -323,6 +327,25 @@ export default function ProjectSettingsClient() {
                                   onChange={(e) => setExistenceLifetimeHours(e.target.value)}
                                 />
                               </div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="text-sm text-white/70">Idle pause (minutes)</p>
+                            <p className="mt-0.5 text-xs text-white/55">
+                              After this many minutes without HTTP traffic to the preview URL, the
+                              instance is slept (PM2 stopped). The next request wakes it (resume
+                              without rebuild) and returns HTTP 302 to the same URL. Empty = off.
+                            </p>
+                            <div className="mt-2 sm:max-w-xs">
+                              <input
+                                className="input"
+                                type="number"
+                                min={0}
+                                placeholder="off"
+                                value={idlePauseMinutes}
+                                onChange={(e) => setIdlePauseMinutes(e.target.value)}
+                              />
                             </div>
                           </div>
                         </div>

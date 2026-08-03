@@ -2,6 +2,8 @@
 
 Preview URLs are served by **nginx on the deployer host**. The core writes one `*.location` file per instance under the locations directory (default `~/deployer/locations`). Each file is named `{project-slug}-{branch-slug}.location` and proxies `/{project-slug}/{branch-slug}/` to the instance's local port. Including the project slug in the path avoids collisions between different projects that share a branch name.
 
+When **Idle pause** is enabled on a project, each active location also writes an nginx `access_log` under the deployer activity directory. After the configured idle minutes, the instance is slept and the location temporarily proxies to the deployer API (`/internal/wake`), which resumes the process and returns **302** to the original URL.
+
 **You need a separate nginx `server` block (or equivalent site config) for every domain or subdomain used as a project's public URL.** If two projects use different hosts — e.g. `preview.app-a.example.com` and `preview.app-b.example.com` — configure nginx for **each** host and point the matching **Public URL** in the dashboard to that host.
 
 ## Per domain / subdomain

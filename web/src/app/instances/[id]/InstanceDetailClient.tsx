@@ -27,6 +27,7 @@ import {
   activeLifetimePausedHint,
   lifetimeExpiryDisplay,
 } from '@/lib/instance-lifetime';
+import { formatInstanceCpu, instanceCpuTitle } from '@/lib/instance-monit';
 
 type InstanceTab = 'overview' | 'environment' | 'logs';
 type StatusAction = 'pause' | 'activate' | 'remove' | null;
@@ -523,14 +524,21 @@ export default function InstanceDetailClient() {
                       </div>
                       <div>
                         <dt className="text-white/55">
-                          CPU / memory ({runnerLabel(row.runner)})
+                          CPU % / memory ({runnerLabel(row.runner)})
                         </dt>
-                        <dd className="text-white/80">
+                        <dd
+                          className="text-white/80"
+                          title={
+                            row.runner === 'docker'
+                              ? undefined
+                              : instanceCpuTitle(row.monit)
+                          }
+                        >
                           {row.runner === 'docker' ? (
                             <span className="text-white/55">n/d (docker)</span>
                           ) : (
                             <>
-                              {typeof row.monit?.cpu === 'number' ? `${row.monit.cpu}%` : '—'} ·{' '}
+                              {formatInstanceCpu(row.monit)} ·{' '}
                               {typeof row.monit?.memory === 'number'
                                 ? `${Math.round(row.monit.memory / (1024 * 1024))} MB`
                                 : '—'}

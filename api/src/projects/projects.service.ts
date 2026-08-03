@@ -26,6 +26,7 @@ export class ProjectsService {
       serverUrl: dto.serverUrl?.trim() || null,
       envVars: {},
       portEnvNames: [],
+      idlePauseMinutes: null,
     });
     return this.repo.save(p);
   }
@@ -91,6 +92,10 @@ export class ProjectsService {
         );
       }
       p.portEnvNames = normalized;
+    }
+    if (dto.idlePauseMinutes !== undefined) {
+      const n = dto.idlePauseMinutes;
+      p.idlePauseMinutes = n == null || n === 0 ? null : n;
     }
     return this.repo.save(p);
   }

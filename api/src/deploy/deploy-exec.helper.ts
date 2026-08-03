@@ -100,3 +100,85 @@ export async function runCorePauseScript(
   const script = join(binDir, 'pause.sh');
   await execFileAsync(script, [projectSlug, branch], { env });
 }
+
+function coreEnv(config: ConfigService): NodeJS.ProcessEnv {
+  const workRoot = config.get<string>('DEPLOYER_WORK_ROOT');
+  if (!workRoot) {
+    throw new Error('DEPLOYER_WORK_ROOT não configurado');
+  }
+  const apiPort = process.env.PORT || '3000';
+  return {
+    ...process.env,
+    DEPLOYER_WORK_ROOT: workRoot,
+    DEPLOYER_WAKE_UPSTREAM: `http://127.0.0.1:${apiPort}`,
+  };
+}
+
+export async function runCoreSleepScript(
+  config: ConfigService,
+  projectSlug: string,
+  branch: string,
+): Promise<void> {
+  const coreDir =
+    config.get<string>('DEPLOYER_CORE_DIR') ||
+    join(__dirname, '..', '..', '..', 'core');
+  const binDir = join(coreDir, 'bin');
+  const script = join(binDir, 'sleep.sh');
+  await execFileAsync(script, [projectSlug, branch], {
+    env: coreEnv(config),
+    maxBuffer: 2 * 1024 * 1024,
+  });
+}
+
+export async function runCoreResumeScript(
+  config: ConfigService,
+  projectSlug: string,
+  branch: string,
+  appEnv?: DeployAppEnvInput,
+): Promise<DeployMeta> {
+  const coreDir =
+    config.get<string>('DEPLOYER_CORE_DIR') ||
+    join(__dirname, '..', '..', '..', 'core');
+  const workRoot = config.get<string>('DEPLOYER_WORK_ROOT');
+  if (!workRoot) {
+    throw new Error('DEPLOYER_WORK_ROOT não configurado');
+  }
+  const binDir = join(coreDir, 'bin');
+  const env: NodeJS.ProcessEnv = {
+    ...coreEnv(config),
+    DEPLOYER_PORT_ENV_NAMES: resolvePortEnvNames(appEnv?.portEnvNames).join(','),
+  };
+
+  const merged = mergeEnvVars(
+    normalizeEnvVars(appEnv?.projectEnv),
+    normalizeEnvVars(appEnv?.instanceEnv),
+  );
+  let envFilePath: string | null = null;
+  if (Object.keys(merged).length > 0) {
+    envFilePath = join(
+      tmpdir(),
+      `deployer-app-env-${randomBytes(8).toString('hex')}.env`,
+    );
+    await writeFile(envFilePath, envVarsToDotenv(merged), 'utf8');
+    env.DEPLOYER_APP_ENV_FILE = envFilePath;
+  }
+
+  const script = join(binDir, 'resume.sh');
+  try {
+    await execFileAsync(script, [projectSlug, branch], {
+      env,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+  } finally {
+    if (envFilePath) {
+      await unlink(envFilePath).catch(() => undefined);
+    }
+  }
+
+  const pm2Name = pm2AppName(projectSlug, branch);
+  const metaPath = join(workRoot, '.deployer-state', `${pm2Name}.deploy-result.json`);
+  const raw = await readFile(metaPath, 'utf8');
+  const meta = JSON.parse(raw) as DeployMeta;
+  await unlink(metaPath).catch(() => undefined);
+  return meta;
+}

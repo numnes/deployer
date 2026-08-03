@@ -149,6 +149,7 @@ function handleProjects(
       maxActiveLifetimeHours: null,
       maxExistenceLifetimeDays: null,
       maxExistenceLifetimeHours: null,
+      idlePauseMinutes: null,
       envVars: {},
       createdAt: new Date().toISOString(),
       nodeId: 'local',

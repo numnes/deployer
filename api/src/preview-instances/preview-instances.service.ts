@@ -25,13 +25,15 @@ import { formatDeployError } from '../deploy/format-deploy-error';
 import {
   runCoreDeployScript,
   runCorePauseScript,
+  runCoreResumeScript,
+  runCoreSleepScript,
   type DeployAppEnvInput,
 } from '../deploy/deploy-exec.helper';
 import { pm2AppName, sanitizeBranchSlug, previewUriPath } from '../deploy/pm2-name.util';
 import { PreviewInstance } from '../entities/preview-instance.entity';
 import { PreviewInstanceStatusEvent } from '../entities/preview-instance-status-event.entity';
 import { ProjectsService } from '../projects/projects.service';
-import { fetchPm2ByName } from '../instances/pm2-list.helper';
+import { fetchPm2ByName, type Pm2Monit } from '../instances/pm2-list.helper';
 import { fetchDockerByName } from '../instances/docker-list.helper';
 import { SettingsService } from '../settings/settings.service';
 import type { PreviewStatus } from './preview-status';
@@ -40,6 +42,7 @@ import {
   computeExistenceExpiresAt,
   lifetimeDurationMs,
 } from './instance-lifetime.util';
+import { stat } from 'fs/promises';
 
 export type { DeployMeta } from '../deploy/deploy-meta';
 
@@ -48,11 +51,11 @@ const execFileAsync = promisify(execFile);
 export type RuntimeInfo = {
   online: boolean;
   status: string | null;
-  monit?: { memory?: number; cpu?: number } | null;
+  monit?: Pm2Monit | null;
 };
 
 export type RuntimeMaps = {
-  pm2: Map<string, { status: string | null; monit?: { memory?: number; cpu?: number } }>;
+  pm2: Map<string, { status: string | null; monit?: Pm2Monit }>;
   docker: Map<string, { running: boolean; status: string | null }>;
 };
 
@@ -80,7 +83,7 @@ export type InstanceListItem = {
   active: boolean;
   /** @deprecated use runtimeStatus */
   pm2Status: string | null;
-  monit?: { memory?: number; cpu?: number } | null;
+  monit?: Pm2Monit | null;
   previewUrl: string | null;
   /** Mensagem do último deploy com falha (status error). */
   lastDeployError: string | null;
@@ -101,6 +104,8 @@ export type InstanceListItem = {
 @Injectable()
 export class PreviewInstancesService {
   private readonly log = new Logger(PreviewInstancesService.name);
+  /** Dedup wake concurrentes por project/branchSlug. */
+  private readonly wakeInflight = new Map<string, Promise<void>>();
 
   constructor(
     @InjectRepository(PreviewInstance)
@@ -142,6 +147,7 @@ export class PreviewInstancesService {
     row.status = next;
     if (next === 'active') {
       row.activatedAt = new Date();
+      row.idleSleep = false;
     }
     const saved = await this.repo.save(row);
     await this.appendEvent(saved.id, prev, next);
@@ -502,11 +508,146 @@ export class PreviewInstancesService {
       throw new BadRequestException('Só é possível pausar instâncias ativas');
     }
     await runCorePauseScript(this.config, row.project.slug, row.branch);
+    row.idleSleep = false;
+    await this.repo.save(row);
     await this.setStatus(row, 'paused');
     await this.processWaitingQueue();
     const maps = await this.fetchRuntimeMaps();
     const fresh = await this.repo.findOne({ where: { id }, relations: ['project'] });
     return this.buildListItem(fresh as PreviewInstance, maps);
+  }
+
+  /**
+   * Idle sleep: para runtime e aponta nginx para /internal/wake (sem liberar checkout).
+   */
+  async sleepInstanceForIdle(id: string): Promise<void> {
+    const row = await this.repo.findOne({
+      where: { id },
+      relations: ['project'],
+    });
+    if (!row?.project) throw new NotFoundException();
+    if (row.status !== 'active') return;
+    await runCoreSleepScript(this.config, row.project.slug, row.branch);
+    row.idleSleep = true;
+    row.port = null;
+    await this.repo.save(row);
+    await this.setStatus(row, 'paused');
+    await this.processWaitingQueue();
+  }
+
+  private activityLogPath(projectSlug: string, branchSlug: string): string {
+    const workRoot =
+      this.config.get<string>('DEPLOYER_WORK_ROOT') ||
+      join(process.env.HOME || '/tmp', '.local/share/deployer');
+    return join(
+      workRoot,
+      '.deployer-state',
+      'activity',
+      `${projectSlug}-${branchSlug}.log`,
+    );
+  }
+
+  private async lastActivityMs(row: PreviewInstance): Promise<number> {
+    const path = this.activityLogPath(row.project.slug, row.branchSlug);
+    try {
+      const st = await stat(path);
+      return st.mtimeMs;
+    } catch {
+      return (row.activatedAt ?? row.updatedAt).getTime();
+    }
+  }
+
+  /**
+   * Acorda instância em idle sleep (resume PM2 sem rebuild). Concurrent requests
+   * compartilham a mesma Promise.
+   */
+  async ensureAwake(projectSlug: string, branchSlug: string): Promise<void> {
+    const key = `${projectSlug}/${branchSlug}`;
+    const existing = this.wakeInflight.get(key);
+    if (existing) {
+      await existing;
+      return;
+    }
+    const run = this.doWake(projectSlug, branchSlug).finally(() => {
+      this.wakeInflight.delete(key);
+    });
+    this.wakeInflight.set(key, run);
+    await run;
+  }
+
+  private async doWake(projectSlug: string, branchSlug: string): Promise<void> {
+    const project = await this.projects.getBySlug(projectSlug);
+    const row = await this.repo.findOne({
+      where: { projectId: project.id, branchSlug },
+      relations: ['project'],
+    });
+    if (!row) {
+      throw new NotFoundException(
+        `Instância ${projectSlug}/${branchSlug} não encontrada`,
+      );
+    }
+    if (row.status === 'active') {
+      return;
+    }
+    if (row.status === 'deploying') {
+      // Espera breve se já há deploy em andamento.
+      for (let i = 0; i < 60; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const fresh = await this.repo.findOne({ where: { id: row.id } });
+        if (fresh?.status === 'active') return;
+        if (fresh?.status === 'error') {
+          throw new BadRequestException(
+            fresh.lastDeployError || 'Deploy falhou durante wake',
+          );
+        }
+      }
+      throw new BadRequestException('Timeout aguardando deploy durante wake');
+    }
+    if (row.status !== 'paused' || !row.idleSleep) {
+      throw new BadRequestException(
+        'Instância não está em idle sleep (use Activate no dashboard)',
+      );
+    }
+
+    const max = await this.settings.getMaxActiveInstances();
+    const active = await this.countActiveSlots();
+    if (active >= max) {
+      throw new BadRequestException(
+        `Sem slot livre para wake (max active=${max})`,
+      );
+    }
+
+    row.lastDeployError = null;
+    await this.repo.save(row);
+    await this.setStatus(row, 'deploying');
+
+    try {
+      const appEnv = await this.resolveDeployAppEnv(projectSlug, row.branch);
+      if ((row.runner || 'pm2') === 'pm2') {
+        const meta = await runCoreResumeScript(
+          this.config,
+          projectSlug,
+          row.branch,
+          appEnv,
+        );
+        await this.finalizeDeploySuccess(meta);
+      } else {
+        // Docker: sem resume rápido — redeploy completo.
+        const meta = await runCoreDeployScript(
+          this.config,
+          projectSlug,
+          project.gitUrl,
+          row.branch,
+          undefined,
+          appEnv,
+        );
+        await this.finalizeDeploySuccess(meta);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await this.finalizeDeployError(projectSlug, row.branch, msg);
+      throw e;
+    }
   }
 
   async activateOrRedeployInstance(id: string): Promise<InstanceListItem> {
@@ -637,13 +778,19 @@ export class PreviewInstancesService {
   /**
    * Pausa instâncias ativas além do limite de tempo ativo do projeto e remove
    * instâncias além do limite de existência (destroy + checkout em disco).
+   * Também aplica idle sleep (idlePauseMinutes) quando configurado.
    * Chamado pelo scheduler a cada minuto.
    */
-  async enforceLifetimeLimits(): Promise<{ paused: number; destroyed: number }> {
+  async enforceLifetimeLimits(): Promise<{
+    paused: number;
+    destroyed: number;
+    idleSlept: number;
+  }> {
     const rows = await this.repo.find({ relations: ['project'] });
     const now = Date.now();
     let paused = 0;
     let destroyed = 0;
+    let idleSlept = 0;
 
     for (const row of rows) {
       if (!row.project) continue;
@@ -675,22 +822,39 @@ export class PreviewInstancesService {
         project.maxActiveLifetimeDays,
         project.maxActiveLifetimeHours,
       );
-      if (activeMs == null) continue;
+      if (activeMs != null) {
+        const activeSince = (row.activatedAt ?? row.updatedAt).getTime();
+        if (now - activeSince >= activeMs) {
+          try {
+            await this.pauseInstance(row.id);
+            paused++;
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            this.log.warn(
+              `Lifetime pause ${row.project.slug}/${row.branch}: ${msg}`,
+            );
+          }
+          continue;
+        }
+      }
 
-      const activeSince = (row.activatedAt ?? row.updatedAt).getTime();
-      if (now - activeSince < activeMs) continue;
-
-      try {
-        await this.pauseInstance(row.id);
-        paused++;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        this.log.warn(
-          `Lifetime pause ${row.project.slug}/${row.branch}: ${msg}`,
-        );
+      const idleMin = project.idlePauseMinutes;
+      if (idleMin != null && idleMin > 0) {
+        try {
+          const last = await this.lastActivityMs(row);
+          if (now - last >= idleMin * 60_000) {
+            await this.sleepInstanceForIdle(row.id);
+            idleSlept++;
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          this.log.warn(
+            `Idle sleep ${row.project.slug}/${row.branch}: ${msg}`,
+          );
+        }
       }
     }
 
-    return { paused, destroyed };
+    return { paused, destroyed, idleSlept };
   }
 }

@@ -23,6 +23,7 @@ In **Projects → Settings**, you can set optional limits per project:
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | **Max active lifetime** (days / hours)    | While `active`, counts down; when it expires the instance is **paused** (runtime stopped, record kept)          |
 | **Max existence lifetime** (days / hours) | From creation; when it expires the instance is **destroyed** (PM2/Docker + nginx + DB record; checkout removed) |
+| **Idle pause** (minutes)                  | After N minutes without HTTP hits on the preview path, the instance is **slept** (nginx → wake endpoint). The next request resumes PM2 (no rebuild) and responds with **302** to the same URL. Empty / 0 = off (default). |
 
 The scheduler runs every minute. The **Instances** list and instance detail page show `activeExpiresAt` and `existenceExpiresAt` when limits apply.
 

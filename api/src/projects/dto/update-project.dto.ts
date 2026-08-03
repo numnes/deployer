@@ -104,4 +104,17 @@ export class UpdateProjectDto {
   @IsArray()
   @IsString({ each: true })
   portEnvNames?: string[];
+
+  @ApiPropertyOptional({
+    example: 30,
+    description:
+      'Minutos sem request HTTP na preview antes de pausar (sleep + wake na próxima request). null ou 0 = desligado.',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v != null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(10080)
+  idlePauseMinutes?: number | null;
 }

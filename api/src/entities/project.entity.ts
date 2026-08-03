@@ -50,6 +50,13 @@ export class Project {
   @Column({ name: 'port_env_names', type: 'jsonb', default: () => "'[]'" })
   portEnvNames: string[];
 
+  /**
+   * Se > 0: pausa automática (sleep) após N minutos sem request HTTP na preview.
+   * null ou 0 = desligado (padrão).
+   */
+  @Column({ name: 'idle_pause_minutes', type: 'int', nullable: true })
+  idlePauseMinutes: number | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

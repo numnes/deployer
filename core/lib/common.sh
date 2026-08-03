@@ -5,9 +5,13 @@ set -euo pipefail
 : "${DEPLOYER_WORK_ROOT:?Defina DEPLOYER_WORK_ROOT (ex: /home/deployer)}"
 : "${DEPLOYER_STATE_DIR:="${DEPLOYER_WORK_ROOT}/.deployer-state"}"
 : "${DEPLOYER_LOCATIONS_DIR:="${HOME}/deployer/locations"}"
+: "${DEPLOYER_ACTIVITY_DIR:="${DEPLOYER_STATE_DIR}/activity"}"
+# Upstream HTTP da API para wake sob demanda (idle sleep).
+: "${DEPLOYER_WAKE_UPSTREAM:=http://127.0.0.1:3000}"
 
 mkdir -p "$DEPLOYER_STATE_DIR"
 mkdir -p "$DEPLOYER_LOCATIONS_DIR"
+mkdir -p "$DEPLOYER_ACTIVITY_DIR"
 
 sanitize_branch_slug() {
   local b="$1"
@@ -112,6 +116,21 @@ preview_uri_path() {
   echo "${project_slug}/${branch_slug}"
 }
 
+activity_log_path() {
+  local project_slug="$1"
+  local branch_slug="$2"
+  echo "${DEPLOYER_ACTIVITY_DIR}/${project_slug}-${branch_slug}.log"
+}
+
+touch_activity_log() {
+  local project_slug="$1"
+  local branch_slug="$2"
+  local path
+  path="$(activity_log_path "$project_slug" "$branch_slug")"
+  mkdir -p "$(dirname "$path")"
+  touch "$path"
+}
+
 nginx_reload() {
   if command -v sudo >/dev/null 2>&1; then
     sudo nginx -t && sudo nginx -s reload
@@ -125,12 +144,16 @@ write_location_file() {
   local project_slug="$2"
   local branch_slug="$3"
   local port="$4"
-  local location_basename uri_path path
+  local location_basename uri_path path activity
   location_basename="$(location_file_basename "$project_slug" "$branch_slug")"
   uri_path="$(preview_uri_path "$project_slug" "$branch_slug")"
+  activity="$(activity_log_path "$project_slug" "$branch_slug")"
   path="$locations_dir/${location_basename}"
+  mkdir -p "$(dirname "$activity")"
+  touch "$activity"
   cat >"$path" <<EOF
 location ^~ /${uri_path}/ {
+    access_log ${activity};
     proxy_pass http://127.0.0.1:${port}/;
     proxy_http_version 1.1;
     proxy_set_header Upgrade \$http_upgrade;
@@ -139,6 +162,36 @@ location ^~ /${uri_path}/ {
     proxy_set_header X-Real-IP \$remote_addr;
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto \$scheme;
+}
+EOF
+  echo "$path"
+}
+
+# Location que encaminha para a API (wake). Usado no idle sleep.
+write_wake_location_file() {
+  local locations_dir="$1"
+  local project_slug="$2"
+  local branch_slug="$3"
+  local wake_upstream="${4:-$DEPLOYER_WAKE_UPSTREAM}"
+  local location_basename uri_path path
+  location_basename="$(location_file_basename "$project_slug" "$branch_slug")"
+  uri_path="$(preview_uri_path "$project_slug" "$branch_slug")"
+  path="$locations_dir/${location_basename}"
+  # rewrite → path fixo /internal/wake (headers carregam project/branch + URI original).
+  cat >"$path" <<EOF
+location ^~ /${uri_path}/ {
+    rewrite ^ /internal/wake break;
+    proxy_pass ${wake_upstream};
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Original-URI \$request_uri;
+    proxy_set_header X-Deployer-Project ${project_slug};
+    proxy_set_header X-Deployer-Branch-Slug ${branch_slug};
+    proxy_read_timeout 120s;
+    proxy_connect_timeout 10s;
 }
 EOF
   echo "$path"

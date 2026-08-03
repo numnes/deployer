@@ -7,6 +7,7 @@ import { ProjectsModule } from '../projects/projects.module';
 import { SettingsModule } from '../settings/settings.module';
 import { InstanceLifetimeScheduler } from './instance-lifetime.scheduler';
 import { PreviewInstancesService } from './preview-instances.service';
+import { WakeController } from './wake.controller';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { PreviewInstancesService } from './preview-instances.service';
     SettingsModule,
     BullModule.registerQueue({ name: 'deploy' }),
   ],
+  controllers: [WakeController],
   providers: [PreviewInstancesService, InstanceLifetimeScheduler],
   exports: [PreviewInstancesService],
 })

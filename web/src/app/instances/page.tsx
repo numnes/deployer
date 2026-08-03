@@ -11,6 +11,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { listInstances, runnerLabel, type InstanceRow } from './::handlers/instances';
 import { InstanceLifetimeCell } from './InstanceLifetimeCell';
+import { formatInstanceCpu, instanceCpuTitle } from '@/lib/instance-monit';
 
 const INSTANCE_STATUSES = ['waiting', 'deploying', 'active', 'paused', 'error'] as const;
 
@@ -211,7 +212,7 @@ function InstancesPageContent() {
                   Runtime status
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
-                  CPU
+                  CPU %
                 </th>
                 <th className="border-b border-white/10 px-3 py-2 text-left font-semibold text-white/85">
                   Memory
@@ -296,12 +297,13 @@ function InstancesPageContent() {
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
                   {i.runtimeStatus ?? i.pm2Status ?? '—'}
                 </td>
-                <td className="border-b border-white/10 px-3 py-2 text-white/70">
-                  {i.runner === 'docker'
-                    ? '—'
-                    : typeof i.monit?.cpu === 'number'
-                      ? `${i.monit.cpu}%`
-                      : '—'}
+                <td
+                  className="border-b border-white/10 px-3 py-2 text-white/70"
+                  title={
+                    i.runner === 'docker' ? undefined : instanceCpuTitle(i.monit)
+                  }
+                >
+                  {i.runner === 'docker' ? '—' : formatInstanceCpu(i.monit)}
                 </td>
                 <td className="border-b border-white/10 px-3 py-2 text-white/70">
                   {i.runner === 'docker'

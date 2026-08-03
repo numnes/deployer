@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Uso: destroy.sh <slug-projeto> <branch>
+# Idle sleep: para o runtime e aponta o nginx para o wake da API (mantém checkout).
+# Uso: sleep.sh <slug-projeto> <branch>
+# Env: DEPLOYER_WAKE_UPSTREAM=http://127.0.0.1:<api-port>
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../lib/common.sh
@@ -18,18 +20,21 @@ BRANCH_SLUG="$(sanitize_branch_slug "$BRANCH")"
 NAME="$(instance_name "$PROJECT_SLUG" "$BRANCH")"
 LOCATIONS_DIR="${DEPLOYER_LOCATIONS_DIR}"
 LOC_FILE="${LOCATIONS_DIR}/$(location_file_basename "$PROJECT_SLUG" "$BRANCH_SLUG")"
-# Formato antigo (apenas branchSlug), removido para compatibilidade.
 LEGACY_LOC_FILE="${LOCATIONS_DIR}/${BRANCH_SLUG}.location"
-TARGET_DIR="${DEPLOYER_WORK_ROOT}/${PROJECT_SLUG}/${BRANCH_SLUG}"
 
-stop_instance "$NAME"
+runner="$(read_instance_runner "$NAME")"
+if [[ "$runner" == "docker" ]]; then
+  docker stop "$NAME" 2>/dev/null || true
+  docker rm "$NAME" 2>/dev/null || true
+else
+  pm2_delete_by_instance_name "$NAME"
+fi
+
 rm -f "${DEPLOYER_STATE_DIR}/${NAME}.port"
 rm -f "${DEPLOYER_STATE_DIR}/${NAME}.deploy-result.json"
-rm -f "${DEPLOYER_STATE_DIR}/${NAME}.runner"
-rm -f "$(activity_log_path "$PROJECT_SLUG" "$BRANCH_SLUG")"
-rm -f "$LOC_FILE"
 rm -f "$LEGACY_LOC_FILE"
-rm -rf "$TARGET_DIR"
+
+write_wake_location_file "$LOCATIONS_DIR" "$PROJECT_SLUG" "$BRANCH_SLUG" "${DEPLOYER_WAKE_UPSTREAM}"
 nginx_reload
 
-echo "OK destroy ${PROJECT_SLUG} branch ${BRANCH}" >&2
+echo "OK sleep ${PROJECT_SLUG} branch ${BRANCH} (wake via ${DEPLOYER_WAKE_UPSTREAM})" >&2
