@@ -30,7 +30,8 @@ else
   pm2_delete_by_instance_name "$NAME"
 fi
 
-rm -f "${DEPLOYER_STATE_DIR}/${NAME}.port"
+# Mantém ${NAME}.port: a porta continua reservada enquanto a instância existir
+# (evita que outro deploy pegue a porta durante o idle sleep).
 rm -f "${DEPLOYER_STATE_DIR}/${NAME}.deploy-result.json"
 rm -f "$LEGACY_LOC_FILE"
 

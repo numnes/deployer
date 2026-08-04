@@ -88,15 +88,119 @@ for a in apps:
   done
 }
 
+is_port_listening() {
+  local p="$1"
+  if ss -H -ltn "sport = :${p}" 2>/dev/null | grep -q .; then
+    return 0
+  fi
+  # Fallback (ss antigo / sem filtro sport)
+  ss -tuln 2>/dev/null | grep -qE ":${p}([[:space:]]|$)"
+}
+
+# Portas gravadas em ${DEPLOYER_STATE_DIR}/*.port (exceto a instância informada).
+list_reserved_ports_except() {
+  local exclude_name="${1:-}"
+  local f base port
+  shopt -s nullglob
+  for f in "${DEPLOYER_STATE_DIR}"/*.port; do
+    base="$(basename "$f" .port)"
+    if [[ -n "$exclude_name" && "$base" == "$exclude_name" ]]; then
+      continue
+    fi
+    port="$(tr -d '[:space:]' <"$f" 2>/dev/null || true)"
+    if [[ "$port" =~ ^[0-9]+$ ]]; then
+      printf '%s\n' "$port"
+    fi
+  done
+}
+
+# Reserva atômica uma porta para a instância (flock + grava ${name}.port).
+# Reusa a reserva própria (sleep/pause/redeploy) mesmo se ainda estiver em listen
+# (stop_instance costuma rodar em seguida). Nunca pega porta de outra instância.
+reserve_free_port() {
+  local name="$1"
+  local start="${2:-10200}"
+  local end="${3:-19999}"
+  local lockfile="${DEPLOYER_STATE_DIR}/.port-alloc.lock"
+  local out
+
+  if [[ -z "$name" ]]; then
+    echo "reserve_free_port: nome da instância obrigatório" >&2
+    return 1
+  fi
+  mkdir -p "$DEPLOYER_STATE_DIR"
+
+  if ! out="$(
+    {
+      flock 200 || exit 1
+      local existing p r skip
+      local -a reserved=()
+
+      if [[ -f "${DEPLOYER_STATE_DIR}/${name}.port" ]]; then
+        existing="$(tr -d '[:space:]' <"${DEPLOYER_STATE_DIR}/${name}.port" 2>/dev/null || true)"
+        if [[ "$existing" =~ ^[0-9]+$ ]]; then
+          # Reserva própria: reusa (sleep/pause ou redeploy da mesma instância).
+          printf '%s\n' "$existing"
+          exit 0
+        fi
+      fi
+
+      while IFS= read -r r; do
+        [[ -n "$r" ]] && reserved+=("$r")
+      done < <(list_reserved_ports_except "$name")
+
+      for ((p = start; p <= end; p++)); do
+        if is_port_listening "$p"; then
+          continue
+        fi
+        skip=0
+        for r in "${reserved[@]+"${reserved[@]}"}"; do
+          if [[ "$r" == "$p" ]]; then
+            skip=1
+            break
+          fi
+        done
+        if [[ "$skip" -eq 1 ]]; then
+          continue
+        fi
+        printf '%s\n' "$p" >"${DEPLOYER_STATE_DIR}/${name}.port"
+        printf '%s\n' "$p"
+        exit 0
+      done
+      echo "Nenhuma porta livre entre ${start} e ${end}" >&2
+      exit 1
+    } 200>"$lockfile"
+  )"; then
+    return 1
+  fi
+  printf '%s\n' "$out"
+}
+
+# Legado: apenas encontra porta livre (escuta + reservas), sem gravar .port.
 next_free_port() {
   local start="${1:-10200}"
   local end="${2:-19999}"
-  local p
+  local p r skip
+  local -a reserved=()
+  while IFS= read -r r; do
+    [[ -n "$r" ]] && reserved+=("$r")
+  done < <(list_reserved_ports_except "")
   for ((p = start; p <= end; p++)); do
-    if ! ss -tuln 2>/dev/null | grep -q ":${p} "; then
-      echo "$p"
-      return 0
+    if is_port_listening "$p"; then
+      continue
     fi
+    skip=0
+    for r in "${reserved[@]+"${reserved[@]}"}"; do
+      if [[ "$r" == "$p" ]]; then
+        skip=1
+        break
+      fi
+    done
+    if [[ "$skip" -eq 1 ]]; then
+      continue
+    fi
+    echo "$p"
+    return 0
   done
   echo "Nenhuma porta livre entre ${start} e ${end}" >&2
   return 1

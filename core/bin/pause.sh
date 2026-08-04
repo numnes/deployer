@@ -30,7 +30,7 @@ else
   pm2_delete_by_instance_name "$NAME"
 fi
 
-rm -f "${DEPLOYER_STATE_DIR}/${NAME}.port"
+# Mantém ${NAME}.port: instância pausada ainda reserva a porta até destroy/reatribuição.
 rm -f "${DEPLOYER_STATE_DIR}/${NAME}.deploy-result.json"
 rm -f "$LOC_FILE"
 rm -f "$LEGACY_LOC_FILE"

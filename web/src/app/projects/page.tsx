@@ -198,8 +198,7 @@ export default function ProjectsPage() {
                     className="input"
                     value={gitUrl}
                     onChange={(e) => setGitUrl(e.target.value)}
-                    placeholder="https://github.com/org/repo.git"
-                    type="url"
+                    placeholder="git@github.com:org/repo.git"
                     required
                   />
                 </div>

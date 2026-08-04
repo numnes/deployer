@@ -211,14 +211,20 @@ deploy_pm2() {
   shift
   local -a build_cmds=("$@")
 
-  PORT="$(next_free_port)"
+  PORT="$(reserve_free_port "$NAME")"
   export PORT
-  echo "$PORT" >"${DEPLOYER_STATE_DIR}/${NAME}.port"
 
   # Para o processo ANTES do build: `npm run build` / `rimraf dist` apaga o
   # target enquanto o PM2 antigo ainda aponta para ele → crash loop MODULE_NOT_FOUND
   # se o build falhar depois (e stop_instance nunca rodar).
   stop_instance "$NAME"
+  # Se a porta reservada ainda estiver ocupada (órfão / roubo legado), realoca.
+  if is_port_listening "$PORT"; then
+    log "[deploy] porta ${PORT} ainda em uso após stop — realocando"
+    rm -f "${DEPLOYER_STATE_DIR}/${NAME}.port"
+    PORT="$(reserve_free_port "$NAME")"
+    export PORT
+  fi
   write_instance_runner "$NAME" "pm2"
 
   if [[ "$RESUME_ONLY" -eq 0 ]]; then
@@ -300,10 +306,14 @@ deploy_docker() {
   fi
 
   local host_port
-  host_port="$(next_free_port)"
-  echo "$host_port" >"${DEPLOYER_STATE_DIR}/${NAME}.port"
+  host_port="$(reserve_free_port "$NAME")"
 
   stop_instance "$NAME"
+  if is_port_listening "$host_port"; then
+    log "[deploy] porta ${host_port} ainda em uso após stop — realocando"
+    rm -f "${DEPLOYER_STATE_DIR}/${NAME}.port"
+    host_port="$(reserve_free_port "$NAME")"
+  fi
   write_instance_runner "$NAME" "docker"
 
   local -a docker_env_args=()

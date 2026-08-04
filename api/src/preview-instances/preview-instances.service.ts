@@ -612,7 +612,7 @@ export class PreviewInstancesService {
     if (row.status !== 'active') return;
     await runCoreSleepScript(this.config, row.project.slug, row.branch);
     row.idleSleep = true;
-    row.port = null;
+    // Mantém row.port: a porta continua reservada no core (${name}.port) durante o sleep.
     await this.repo.save(row);
     await this.setStatus(row, 'paused');
     await this.processWaitingQueue();
