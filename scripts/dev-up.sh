@@ -13,19 +13,62 @@ compose() {
   docker compose --project-directory "${ROOT_DIR}" -f "${ROOT_DIR}/docker-compose.dev.yml" "$@"
 }
 
-# Roda comando em silêncio; em falha imprime o log completo.
+SPINNER_PID=""
+
+stop_spinner() {
+  if [[ -n "${SPINNER_PID:-}" ]]; then
+    kill "$SPINNER_PID" 2>/dev/null || true
+    wait "$SPINNER_PID" 2>/dev/null || true
+    SPINNER_PID=""
+    # Limpa a linha do spinner (\r + erase).
+    printf '\r\033[K' >&2
+  fi
+}
+
+trap stop_spinner EXIT
+
+# Spinner no stderr quando há TTY; caso contrário só imprime o label.
+start_spinner() {
+  local label="$1"
+  stop_spinner
+  if [[ ! -t 2 ]]; then
+    echo "[dev-up] ${label}" >&2
+    return
+  fi
+  (
+    local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    local i=0
+    while true; do
+      printf '\r[dev-up] %s %s' "${frames[i]}" "$label" >&2
+      i=$(( (i + 1) % ${#frames[@]} ))
+      sleep 0.1
+    done
+  ) &
+  SPINNER_PID=$!
+}
+
+# Roda comando em silêncio com spinner; em falha imprime o log completo.
 run_quiet() {
   local label="$1"
   shift
-  local log
+  local log ec
   log="$(mktemp "${TMPDIR:-/tmp}/deployer-build.XXXXXX")"
-  echo "[dev-up] ${label}"
-  if "$@" >"$log" 2>&1; then
+  start_spinner "$label"
+  set +e
+  "$@" >"$log" 2>&1
+  ec=$?
+  set -e
+  stop_spinner
+  if [[ "$ec" -eq 0 ]]; then
+    if [[ -t 2 ]]; then
+      echo "[dev-up] ✓ ${label}" >&2
+    else
+      echo "[dev-up] ${label} done" >&2
+    fi
     rm -f "$log"
     return 0
   fi
-  local ec=$?
-  echo "[dev-up] Failed: ${label}" >&2
+  echo "[dev-up] ✗ ${label}" >&2
   echo "[dev-up] Build log:" >&2
   cat "$log" >&2 || true
   rm -f "$log"
@@ -139,22 +182,13 @@ else
   PM2=(npx --yes pm2)
 fi
 
-api_build_log="$(mktemp "${TMPDIR:-/tmp}/deployer-api-build.XXXXXX")"
-echo "[dev-up] Rebuilding Deployer API..."
-if (
-  cd "${ROOT_DIR}/api"
-  "${PKG_MGR[@]}" install
-  "${PKG_MGR[@]}" run build
-) >"$api_build_log" 2>&1; then
-  rm -f "$api_build_log"
-else
-  ec=$?
-  echo "[dev-up] Failed: Rebuilding Deployer API..." >&2
-  echo "[dev-up] Build log:" >&2
-  cat "$api_build_log" >&2 || true
-  rm -f "$api_build_log"
-  exit "$ec"
-fi
+run_quiet "Rebuilding Deployer API..." bash -c '
+  set -euo pipefail
+  cd "$1"
+  shift
+  "$@" install
+  "$@" run build
+' _ "${ROOT_DIR}/api" "${PKG_MGR[@]}"
 
 pushd "${ROOT_DIR}/api" >/dev/null
 set -a
