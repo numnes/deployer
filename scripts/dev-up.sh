@@ -13,6 +13,25 @@ compose() {
   docker compose --project-directory "${ROOT_DIR}" -f "${ROOT_DIR}/docker-compose.dev.yml" "$@"
 }
 
+# Roda comando em silêncio; em falha imprime o log completo.
+run_quiet() {
+  local label="$1"
+  shift
+  local log
+  log="$(mktemp "${TMPDIR:-/tmp}/deployer-build.XXXXXX")"
+  echo "[dev-up] ${label}"
+  if "$@" >"$log" 2>&1; then
+    rm -f "$log"
+    return 0
+  fi
+  local ec=$?
+  echo "[dev-up] Failed: ${label}" >&2
+  echo "[dev-up] Build log:" >&2
+  cat "$log" >&2 || true
+  rm -f "$log"
+  return "$ec"
+}
+
 wait_for_http() {
   local url="$1"
   local label="$2"
@@ -87,11 +106,10 @@ else
 fi
 
 echo "[dev-up] Starting Postgres/Redis in Docker..."
-compose up -d postgres redis
+compose up -d postgres redis >/dev/null
 
-echo "[dev-up] Building web (NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}${NEXT_PUBLIC_BASE_PATH:+, BASE_PATH=${NEXT_PUBLIC_BASE_PATH}}, version=${NEXT_PUBLIC_DEPLOYER_VERSION})..."
-compose build web
-compose up -d web
+run_quiet "Rebuilding Deployer web interface..." compose build web
+compose up -d web >/dev/null
 
 echo "[dev-up] Waiting for Postgres to become healthy..."
 postgres_ok=false
@@ -109,7 +127,6 @@ if [[ "$postgres_ok" != "true" ]]; then
   exit 1
 fi
 
-echo "[dev-up] Building API (Nest) and starting with PM2..."
 if command -v pnpm >/dev/null 2>&1; then
   PKG_MGR=(pnpm)
 else
@@ -122,10 +139,22 @@ else
   PM2=(npx --yes pm2)
 fi
 
-pushd "${ROOT_DIR}/api" >/dev/null
-"${PKG_MGR[@]}" install
-"${PKG_MGR[@]}" run build
-popd >/dev/null
+api_build_log="$(mktemp "${TMPDIR:-/tmp}/deployer-api-build.XXXXXX")"
+echo "[dev-up] Rebuilding Deployer API..."
+if (
+  cd "${ROOT_DIR}/api"
+  "${PKG_MGR[@]}" install
+  "${PKG_MGR[@]}" run build
+) >"$api_build_log" 2>&1; then
+  rm -f "$api_build_log"
+else
+  ec=$?
+  echo "[dev-up] Failed: Rebuilding Deployer API..." >&2
+  echo "[dev-up] Build log:" >&2
+  cat "$api_build_log" >&2 || true
+  rm -f "$api_build_log"
+  exit "$ec"
+fi
 
 pushd "${ROOT_DIR}/api" >/dev/null
 set -a
@@ -134,7 +163,7 @@ source ".env"
 set +a
 
 "${PM2[@]}" delete deployer-api >/dev/null 2>&1 || true
-"${PM2[@]}" start "${ROOT_DIR}/api/dist/main.js" --name deployer-api --time --update-env --cwd "${ROOT_DIR}/api"
+"${PM2[@]}" start "${ROOT_DIR}/api/dist/main.js" --name deployer-api --time --update-env --cwd "${ROOT_DIR}/api" >/dev/null
 popd >/dev/null
 
 echo "[dev-up] Waiting for API (schema sync)..."
